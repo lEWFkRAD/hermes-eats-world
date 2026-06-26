@@ -12,12 +12,31 @@ from ..schema.models import TierClassification, TreeSummary
 
 logger = logging.getLogger(__name__)
 
-# Thresholds — to be calibrated against real apps in P1-5.
-# Current values are the spike's empirically tested defaults.
+# Tier classification thresholds — calibrated against real apps.
+#
+# Calibration data (depth 5):
+#   File Explorer:  89 elems, 16 types, 2 patterns → T1/T2
+#   Edge/Chrome:    25 elems,  5 types, 3 patterns → T1/T2
+#   Amazon Music:   17 elems,  8 types, 2 patterns → T1/T2
+#   Mail/Outlook:   18 elems,  6 types, 2 patterns → T1/T2
+#   Parsec:          7 elems,  5 types, 2 patterns → T2
+#   Hermes GUI:     12 elems,  3 types, 3 patterns → T1/T2
+#
+# Notes:
+#   - T1 threshold (>=50 AND >=4 patterns) is aspirational. True T1 apps
+#     (Word, Excel, VS Code, Premiere) expose 4+ unique control patterns
+#     (ValuePattern, SelectionPattern, TogglePattern, TextPattern, etc.).
+#     Most running apps hit T1/T2 because their visible surface has fewer
+#     pattern types even if element counts are high.
+#   - Chromium/Electron apps show sparse trees (rendered via GPU/CES) but
+#     expose 3 patterns at the browser level. They land in T1/T2 at depth 5.
+#   - Parsec/game overlays correctly land in T2 (sparse, few elements).
+#   - T3 (opaque) is for fullscreen games, video players, or locked-down
+#     apps with essentially no UIA tree.
 TIER_THRESHOLDS = {
     "min_elements_t1": 50,       # >= this → T1 candidate
-    "min_patterns_t1": 4,       # >= unique pattern types → T1 candidate
-    "min_elements_t1t2": 10,    # >= this → T1/T2 hybrid
+    "min_patterns_t1": 4,        # >= unique pattern types → T1 candidate (aspirational)
+    "min_elements_t1t2": 10,     # >= this → T1/T2 hybrid
 }
 
 
