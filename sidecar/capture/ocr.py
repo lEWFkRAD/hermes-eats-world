@@ -23,6 +23,7 @@ Usage:
 
 import logging
 import os
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -282,22 +283,27 @@ class _PILFallbackBackend:
 class OCREngine:
     """Main OCR engine with automatic backend selection.
     
-    Probes for available backends on initialization and uses the best one.
-    Order of preference: pytesseract > easyocr > surya > rapidocr > PIL fallback.
+    Probes for available backends on first use (lazy initialization) and uses
+    the best one. Order of preference: pytesseract > easyocr > surya > rapidocr > PIL fallback.
     """
 
     def __init__(self, preferred_backend: Optional[str] = None):
-        self._backend = None
+        self._preferred_backend = preferred_backend
+        self._backend: Any = None
         self._backend_name = "none"
+        self._initialized = False
 
-        if preferred_backend:
-            self._try_init(preferred_backend)
+    def _ensure_initialized(self):
+        """Lazy initialization — only probe backends on first recognize call."""
+        if self._initialized:
+            return
+        if self._preferred_backend:
+            self._try_init(self._preferred_backend)
         else:
-            # Try backends in order of preference
             for cls in [_PytesseractBackend, _EasyOCRBackend, _SuryaBackend]:
                 if self._try_init(cls.name):
                     break
-
+        self._initialized = True
         logger.info("OCR engine initialized with backend: %s", self._backend_name)
 
     def _try_init(self, backend_name: str) -> bool:
@@ -366,10 +372,9 @@ class OCREngine:
                    lang: str = "eng",
                    region: Optional[Tuple[int, int, int, int]] = None) -> OCRResult:
         """Internal recognition method."""
+        self._ensure_initialized()
         if self._backend is None:
-            # Should never happen (PILFallbackBackend is always available)
             return _PILFallbackBackend().recognize(image, lang, region)
-
         return self._backend.recognize(image, lang, region)
 
     def search_text(self, image_path: str, query: str,
@@ -404,13 +409,17 @@ class OCREngine:
         return matches
 
 
-# Singleton instance — created on first access
+# Singleton instance — created on first access (thread-safe)
 _ocr_engine: Optional[OCREngine] = None
+_ocr_lock = threading.Lock()
 
 
 def get_ocr_engine(preferred_backend: Optional[str] = None) -> OCREngine:
-    """Get the global OCR engine instance (lazy initialization)."""
+    """Get the global OCR engine instance (lazy, thread-safe initialization)."""
     global _ocr_engine
-    if _ocr_engine is None:
-        _ocr_engine = OCREngine(preferred_backend=preferred_backend)
+    if _ocr_engine is not None:
+        return _ocr_engine
+    with _ocr_lock:
+        if _ocr_engine is None:
+            _ocr_engine = OCREngine(preferred_backend=preferred_backend)
     return _ocr_engine

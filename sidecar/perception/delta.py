@@ -18,7 +18,8 @@ Usage:
     result2 = perceive_target(title="File Explorer")
 
     delta = state_delta(result1.summary, result2.summary, result1.tree, result2.tree)
-    print(f"Added: {len(delta.added)}, Removed: {len(delta.removed)}, Changed: {len(delta.changed)}")
+    logger.info("Delta: Added %d, Removed %d, Changed %d",
+                len(delta.added), len(delta.removed), len(delta.changed))
 """
 
 import logging
