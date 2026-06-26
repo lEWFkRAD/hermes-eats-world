@@ -38,18 +38,22 @@ from ..schema import (
 )
 from ..target import find_window, list_windows, is_frame_window, drill_frame, WindowTarget
 from .env_check import check_environment, set_dpi_awareness
+from .logging import setup_console_logging, setup_structured_logging
 
 logger = logging.getLogger(__name__)
 
 
-def setup_logging(verbose: bool = False):
-    """Configure logging."""
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%H:%M:%S",
-    )
+def setup_logging(verbose: bool = False, json_logs: bool = False):
+    """Configure logging.
+
+    Args:
+        verbose: Use DEBUG level.
+        json_logs: Use structured JSON output.
+    """
+    if json_logs:
+        setup_structured_logging(level="DEBUG" if verbose else "INFO", console=True)
+    else:
+        setup_console_logging(verbose=verbose)
 
 
 def run_perceive(args) -> int:
@@ -178,6 +182,7 @@ def main(argv=None):
         description="Hermes Eats World — Windows UI perception sidecar",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
+    parser.add_argument("--json-logs", action="store_true", help="Structured JSON log output")
     parser.add_argument("--list", action="store_true", help="List all visible windows")
     parser.add_argument("--target", type=str, help="Window title (substring match)")
     parser.add_argument("--process", type=str, help="Process name (e.g. notepad.exe)")
@@ -188,7 +193,7 @@ def main(argv=None):
     parser.add_argument("--min-size", type=int, default=100, help="Minimum window size for --list (default: 100)")
 
     args = parser.parse_args(argv)
-    setup_logging(args.verbose)
+    setup_logging(args.verbose, json_logs=args.json_logs)
 
     # Environment check
     set_dpi_awareness()
