@@ -3,10 +3,14 @@ Hermes Eats World — Window Targeting
 =====================================
 Find and attach to windows by title (substring), process name, or class name.
 Includes PID→process-name lookup via ctypes (no psutil dependency).
+
+Returns both TargetInfo metadata AND the live uiautomation Control handle,
+so the caller doesn't need to re-attach (eliminates the double-attach bug).
 """
 
 import ctypes
 import logging
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 import uiautomation
@@ -14,6 +18,19 @@ import uiautomation
 from ..schema.models import BoundingBox, TargetInfo, WindowInfo
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class WindowTarget:
+    """Combined target: metadata + live control handle.
+    
+    Avoids the double-attach anti-pattern where find_window() returns
+    metadata and the caller re-attaches with a new WindowControl().
+    """
+    info: TargetInfo
+    control: uiautomation.Control
+    # For tracing/debugging
+    search_method: str = field(default="")  # "title", "process", "class"
 
 
 def _pid_to_process_name(pid: int) -> str:
@@ -40,17 +57,27 @@ def find_window(
     process_name: Optional[str] = None,
     class_name: Optional[str] = None,
     timeout: int = 5,
-) -> Optional[TargetInfo]:
+) -> Optional[WindowTarget]:
     """Find a window by title, process name, or class name.
     
     Priority: title > process_name > class_name (first match wins).
     Uses SubName for substring matching on window titles.
+    
+    Returns WindowTarget with both metadata AND the live control handle,
+    so the caller can walk the tree immediately without re-attaching.
+    
+    For backward compatibility, the returned object is also truthy/falsy
+    like the old TargetInfo return.
     """
     # Search by title (substring)
     if title:
         win = uiautomation.WindowControl(searchDepth=1, SubName=title)
         if win.Exists(0, timeout):
-            return _make_target_info(win)
+            return WindowTarget(
+                info=_make_target_info(win),
+                control=win,
+                search_method="title",
+            )
 
     # Search by process name
     if process_name:
@@ -59,7 +86,11 @@ def find_window(
                 pid = w.ProcessId
                 actual_name = _pid_to_process_name(pid)
                 if actual_name.lower() == process_name.lower():
-                    return _make_target_info(w)
+                    return WindowTarget(
+                        info=_make_target_info(w),
+                        control=w,
+                        search_method="process",
+                    )
             except Exception as e:
                 logger.debug("Process name search error: %s", e)
 
@@ -67,7 +98,11 @@ def find_window(
     if class_name:
         win = uiautomation.WindowControl(searchDepth=1, ClassName=class_name)
         if win.Exists(0, timeout):
-            return _make_target_info(win)
+            return WindowTarget(
+                info=_make_target_info(win),
+                control=win,
+                search_method="class",
+            )
 
     return None
 

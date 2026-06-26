@@ -36,7 +36,7 @@ from ..schema import (
     TierClassification,
     WindowInfo,
 )
-from ..target import find_window, list_windows, is_frame_window, drill_frame
+from ..target import find_window, list_windows, is_frame_window, drill_frame, WindowTarget
 from .env_check import check_environment, set_dpi_awareness
 
 logger = logging.getLogger(__name__)
@@ -56,36 +56,31 @@ def run_perceive(args) -> int:
     """Execute the PERCEIVE pipeline: find window → walk tree → classify → output."""
     start = time.time()
 
-    # 1. Find window
-    target = find_window(
+    # 1. Find window — returns WindowTarget with metadata + live control
+    target_result = find_window(
         title=args.target,
         process_name=args.process,
         class_name=args.cls,
         timeout=5,
     )
 
-    if target is None:
+    if target_result is None:
         query = args.target or args.process or args.cls or "unknown"
         err = make_error("window_not_found", f"Could not find window matching '{query}'", target=query)
         print(err, file=sys.stderr)
         return 1
 
-    logger.info("Found window: %s (PID %d, class %s)", target.name, target.process_id, target.class_name)
+    target: WindowTarget = target_result
+    target_info = target.info
+    win = target.control
 
-    # 2. Attach and walk tree
-    import uiautomation
-
-    win = uiautomation.WindowControl(
-        searchDepth=1,
-        SubName=target.name,
+    logger.info(
+        "Found window via %s: %s (PID %d, class %s)",
+        target.search_method, target_info.name, target_info.process_id, target_info.class_name,
     )
-    if not win.Exists(0, 3):
-        err = make_error("window_attach_failed", f"Could not attach to window '{target.name}'", target=target.name)
-        print(err, file=sys.stderr)
-        return 1
 
-    # UWP frame drilling
-    if is_frame_window(target.class_name):
+    # 2. UWP frame drilling (if needed)
+    if is_frame_window(target_info.class_name):
         logger.info("Detected ApplicationFrameWindow — drilling for content")
         content = drill_frame(win)
         if content:
@@ -97,32 +92,32 @@ def run_perceive(args) -> int:
     # Get patterns at root level
     patterns = get_control_patterns(win)
 
-    # Walk tree
+    # 3. Walk tree
     max_depth = min(args.depth, 500)
     root_elem, truncated = element_to_dict(win, depth=0, max_depth=max_depth, from_patterns=patterns)
 
     if truncated:
         logger.warning("Tree was truncated at depth %d", max_depth)
 
-    # 3. Summarize and classify
-    summary = summarize_tree(win)
+    # 4. Summarize and classify (operate on Element model, not raw Control)
+    summary = summarize_tree(root_elem)
     tier = classify_tier(summary)
 
     elapsed = time.time() - start
 
-    # 4. Screenshot
+    # 5. Screenshot
     screenshot_path = None
-    if args.screenshot and target.bounding_box:
+    if args.screenshot and target_info.bounding_box:
         screenshot_path = capture_window(
-            target.bounding_box,
-            target.hwnd,
+            target_info.bounding_box,
+            target_info.hwnd,
             output_dir=str(Path(__file__).parents[2]),
         )
 
-    # 5. Build snapshot
+    # 6. Build snapshot
     snapshot = TreeSnapshot(
         schema_version=SCHEMA_VERSION,
-        target=target,
+        target=target_info,
         tier=tier,
         summary=summary,
         tree=root_elem,
@@ -130,7 +125,7 @@ def run_perceive(args) -> int:
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
-    # 6. Output
+    # 7. Output
     output_json = serialize_model(snapshot)
 
     if args.output:

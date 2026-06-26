@@ -3,11 +3,13 @@ Hermes Eats World — UIA Tree Walker
 ====================================
 Walk the UIA accessibility tree and produce structured Element models.
 Includes: stable element IDs, depth capping, single-pass summarization,
-and truncation tracking.
+truncation tracking, and per-element + total timeouts.
 """
 
 import hashlib
 import logging
+import signal
+import time
 from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -21,6 +23,23 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_DEPTH = 3
 HARD_MAX_DEPTH = 500
 MAX_NAME_LEN = 200
+
+# Timeout configuration (seconds)
+PER_ELEMENT_TIMEOUT = 5.0    # Max time per element property access
+TOTAL_TREE_TIMEOUT = 30.0    # Max time for entire tree walk
+
+# Set global UIA search timeout (uiautomation library setting)
+uiautomation.SearchTimeout = PER_ELEMENT_TIMEOUT
+
+
+class TreeWalkTimeout(Exception):
+    """Raised when the total tree walk exceeds TOTAL_TREE_TIMEOUT."""
+    pass
+
+
+def _timeout_handler(signum, frame):
+    """Signal handler for total timeout."""
+    raise TreeWalkTimeout(f"Tree walk exceeded {TOTAL_TREE_TIMEOUT}s timeout")
 
 
 def make_element_id(element) -> str:
@@ -67,12 +86,23 @@ def element_to_dict(
     depth: int = 0,
     max_depth: int = DEFAULT_MAX_DEPTH,
     from_patterns: Optional[Dict[str, Any]] = None,
+    _start_time: Optional[float] = None,
 ) -> Tuple[Element, bool]:
     """Convert a UIA element to an Element model with children.
     
     Returns (Element, truncated) where truncated is True if we stopped
-    recursing due to the depth limit.
+    recursing due to the depth limit or timeout.
+    
+    Args:
+        element: The UIA element to convert.
+        depth: Current depth in the tree.
+        max_depth: Maximum depth to recurse to.
+        from_patterns: Patterns dictionary from the parent.
+        _start_time: Internal — wall-clock start time for timeout tracking.
     """
+    if _start_time is None:
+        _start_time = time.monotonic()
+    
     truncated = False
 
     # Build element dict
@@ -97,12 +127,24 @@ def element_to_dict(
             children = element.GetChildren()
             if children:
                 for child in children:
+                    # Check total timeout before each child
+                    elapsed = time.monotonic() - _start_time
+                    if elapsed > TOTAL_TREE_TIMEOUT:
+                        logger.warning(
+                            "Tree walk timeout after %.1fs — stopping recursion",
+                            elapsed,
+                        )
+                        truncated = True
+                        break
                     child_elem, child_truncated = element_to_dict(
-                        child, depth + 1, max_depth, from_patterns
+                        child, depth + 1, max_depth, from_patterns, _start_time
                     )
                     elem.children.append(child_elem)
                     if child_truncated:
                         truncated = True
+        except TreeWalkTimeout:
+            logger.warning("Total tree walk timeout exceeded")
+            truncated = True
         except Exception as e:
             logger.debug("Failed to get children at depth %d: %s", depth, e)
     else:
@@ -135,8 +177,9 @@ def summarize_tree(root_element: Element) -> TreeSummary:
 
         control_types[elem.control_type] += 1
 
-        for pat_name in elem.patterns:
-            patterns[pat_name] += 1
+        if elem.patterns:
+            for pat_name in elem.patterns:
+                patterns[pat_name] += 1
 
         for child in elem.children:
             stack.append(child)
