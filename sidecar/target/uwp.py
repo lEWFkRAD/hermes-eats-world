@@ -40,12 +40,41 @@ def drill_frame(frame_control) -> Optional[uiautomation.Control]:
     1. Get children of the frame
     2. Look for known content window classes
     3. If none found, pick the child with the largest bounding rect
-    4. Return the content window, or None if drilling fails
+    4. If still none (UIPI), try ControlView tree walk at depth 1-3
+    5. Return the content window, or None if drilling fails
     """
     try:
         children = frame_control.GetChildren()
         if not children:
-            logger.warning("Frame window has no children — cannot drill")
+            # Fallback: try UIA tree walker at shallow depth
+            logger.debug("Frame has no direct children — trying tree walker")
+            best_child = None
+            best_area = 0
+            # Walk first-level children via GetFirstChildControl
+            child = frame_control.GetFirstChildControl()
+            while child is not None:
+                try:
+                    rect = child.BoundingRectangle
+                    area = rect.width() * rect.height()
+                    cls = child.ClassName or ""
+                    if cls in CONTENT_CLASSES:
+                        logger.info("Found content via tree walker: %s", cls)
+                        return child
+                    if area > best_area:
+                        best_area = area
+                        best_child = child
+                except Exception:
+                    pass
+                child = child.GetNextSiblingControl()
+            
+            if best_child and best_area > 0:
+                logger.info("Selected largest child via tree walker (area=%d)", best_area)
+                return best_child
+            
+            logger.warning(
+                "Frame window has no accessible children — "
+                "this may be due to UIPI restrictions or UWP sandboxing"
+            )
             return None
 
         # Priority 1: Known content window classes

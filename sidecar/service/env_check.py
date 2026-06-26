@@ -208,12 +208,26 @@ def get_window_dpi(hwnd: int) -> int:
 
 
 def logical_to_device(hwnd: int, left: int, top: int, width: int, height: int):
-    """Convert UIA logical coordinates to device (pixel) coordinates.
+    """Convert UIA coordinates to device (pixel) coordinates.
+    
+    IMPORTANT: When the process is per-monitor DPI-aware, UIA already returns
+    device-pixel coordinates, so no scaling is needed. Only apply scaling
+    when the process is DPI-unaware (UIA returns logical coords).
     
     Uses GetDpiForWindow to get the target window's DPI scale factor.
     """
+    # When per-monitor DPI-aware, UIA returns device coordinates directly.
+    # No conversion needed.
+    awareness = _get_dpi_awareness()
+    if awareness in ("Per-monitor", "System-aware"):
+        return left, top, width, height
+    
+    # DPI-unaware: UIA returns logical coordinates, scale to device pixels
     dpi = get_window_dpi(hwnd)
     scale = dpi / 96.0
+    if scale == 1.0:
+        return left, top, width, height
+    
     return (
         int(left * scale),
         int(top * scale),
