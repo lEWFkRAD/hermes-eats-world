@@ -49,7 +49,7 @@ WM_SETTEXT = 0x000C
 WM_KEYDOWN = 0x0100
 WM_KEYUP = 0x0101
 
-# Win32 API handles
+# Win32 API handles — argtypes set after struct definitions below
 USER32 = ctypes.WinDLL("user32", use_last_error=True)
 KERNEL32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
@@ -87,6 +87,24 @@ class _INPUT(ctypes.Structure):
         ("type", wintypes.DWORD),
         ("u", _INPUT_U),
     ]
+
+
+# Set argtypes for all Win32 API calls after struct definitions
+PINPUT = ctypes.POINTER(_INPUT)
+USER32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+USER32.PostMessageW.restype = wintypes.BOOL
+USER32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+USER32.SendMessageW.restype = wintypes.LPARAM
+USER32.SendInput.argtypes = [wintypes.UINT, PINPUT, ctypes.c_int]
+USER32.SendInput.restype = wintypes.UINT
+USER32.SetForegroundWindow.argtypes = [wintypes.HWND]
+USER32.SetForegroundWindow.restype = wintypes.BOOL
+USER32.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
+USER32.ClientToScreen.restype = wintypes.BOOL
+USER32.ScreenToClient.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
+USER32.ScreenToClient.restype = wintypes.BOOL
+USER32.GetSystemMetrics.argtypes = [ctypes.c_int]
+USER32.GetSystemMetrics.restype = ctypes.c_int
 
 
 def _get_screen_dimensions() -> Tuple[int, int]:
@@ -259,7 +277,9 @@ def post_message(hwnd: int, msg: str, text: Optional[str] = None,
         return False
 
     if msg == "WM_SETTEXT" and text is not None:
-        result = USER32.PostMessageW(hwnd, WM_SETTEXT, 0, text)
+        # WM_SETTEXT requires SendMessageW (not PostMessageW) with LPCWSTR
+        # Use c_wchar_p for proper wide string marshaling
+        result = USER32.SendMessageW(hwnd, WM_SETTEXT, 0, ctypes.c_wchar_p(text))
     else:
         # Pack client coordinates into lparam if provided
         result = USER32.PostMessageW(hwnd, msg_code, wparam, lparam)

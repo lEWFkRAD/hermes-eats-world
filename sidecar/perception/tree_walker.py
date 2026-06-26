@@ -8,7 +8,6 @@ truncation tracking, and per-element + total timeouts.
 
 import hashlib
 import logging
-import signal
 import time
 from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
@@ -35,11 +34,6 @@ uiautomation.SearchTimeout = PER_ELEMENT_TIMEOUT
 class TreeWalkTimeout(Exception):
     """Raised when the total tree walk exceeds TOTAL_TREE_TIMEOUT."""
     pass
-
-
-def _timeout_handler(signum, frame):
-    """Signal handler for total timeout."""
-    raise TreeWalkTimeout(f"Tree walk exceeded {TOTAL_TREE_TIMEOUT}s timeout")
 
 
 def make_element_id(element) -> str:
@@ -81,6 +75,35 @@ def _get_bounding_rect(element) -> Optional[BoundingBox]:
         return None
 
 
+def _get_control_patterns(element) -> Optional[Dict[str, Any]]:
+    """Extract supported control patterns from a UIA element."""
+    try:
+        patterns = {}
+        for pattern_name in [
+            "Invoke", "Value", "Toggle", "Selection", "ExpandCollapse",
+            "Scroll", "ScrollItem", "Transform", "SelectionItem",
+            "Dock", "Table", "Row", "Column", "Text", "CustomNavigation",
+            "DockPattern", "SelectionPattern", "ValuePattern",
+            "ScrollItemPattern", "ScrollPattern", "GridPattern",
+            "GridItemPattern", "MultipleViewPattern", "WindowPattern",
+            "ExpansionPattern", "SelectionContainerPattern",
+            "ItemContainerPattern", "VirtualizedItemPattern",
+            "SynchronizedInputPattern", "ObjectModelPattern",
+            "AnnotationPattern", "TextChildPattern",
+        ]:
+            try:
+                if hasattr(element, f"Get{pattern_name}Pattern"):
+                    pat = getattr(element, f"Get{pattern_name}Pattern")()
+                    if pat is not None:
+                        patterns[pattern_name] = True
+            except Exception:
+                pass
+        return patterns if patterns else None
+    except Exception as e:
+        logger.debug("Failed to get patterns: %s", e)
+        return None
+
+
 def element_to_dict(
     element,
     depth: int = 0,
@@ -89,21 +112,24 @@ def element_to_dict(
     _start_time: Optional[float] = None,
 ) -> Tuple[Element, bool]:
     """Convert a UIA element to an Element model with children.
-    
+
     Returns (Element, truncated) where truncated is True if we stopped
     recursing due to the depth limit or timeout.
-    
+
     Args:
         element: The UIA element to convert.
         depth: Current depth in the tree.
         max_depth: Maximum depth to recurse to.
-        from_patterns: Patterns dictionary from the parent.
+        from_patterns: Patterns dictionary (legacy, only used for root element).
         _start_time: Internal — wall-clock start time for timeout tracking.
     """
     if _start_time is None:
         _start_time = time.monotonic()
-    
+
     truncated = False
+
+    # Extract patterns for THIS element (not inherited from parent)
+    elem_patterns = from_patterns if depth == 0 else _get_control_patterns(element)
 
     # Build element dict
     elem = Element(
@@ -118,7 +144,7 @@ def element_to_dict(
         is_offscreen=element.IsOffscreen,
         bounding_box=_get_bounding_rect(element),
         depth=depth,
-        patterns=from_patterns,
+        patterns=elem_patterns,
     )
 
     # Recurse into children if depth allows
@@ -137,7 +163,7 @@ def element_to_dict(
                         truncated = True
                         break
                     child_elem, child_truncated = element_to_dict(
-                        child, depth + 1, max_depth, from_patterns, _start_time
+                        child, depth + 1, max_depth, None, _start_time
                     )
                     elem.children.append(child_elem)
                     if child_truncated:

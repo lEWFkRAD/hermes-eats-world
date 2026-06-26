@@ -42,11 +42,13 @@ def _pid_to_process_name(pid: int) -> str:
         handle = kernel.OpenProcess(PROCESS_QUERY_INFO | PROCESS_VM_READ, False, pid)
         if not handle:
             return ""
-        name = ctypes.create_unicode_buffer(260)
-        kernel.QueryFullProcessImageNameW(handle, 0, name)
-        kernel.CloseHandle(handle)
-        # Return just the basename
-        return name.value.split("\\")[-1]
+        try:
+            name = ctypes.create_unicode_buffer(260)
+            kernel.QueryFullProcessImageNameW(handle, 0, name)
+            # Return just the basename
+            return name.value.split("\\")[-1]
+        finally:
+            kernel.CloseHandle(handle)
     except Exception as e:
         logger.debug("PID lookup failed for %d: %s", pid, e)
         return ""

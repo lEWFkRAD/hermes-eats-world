@@ -141,9 +141,12 @@ def select_item(element: Any, index: int, timeout: float = 5.0) -> bool:
         if sel_pattern:
             items = sel_pattern.Current.Selection
             if items:
-                items[0].Select()
-                logger.info("Selected item in: %s", element.Name)
-                return True
+                # Iterate to find the item at the requested index
+                for i, item in enumerate(items):
+                    if i == index:
+                        item.Select()
+                        logger.info("Selected item %d in: %s", index, element.Name)
+                        return True
 
         # Fall back to expanding and clicking
         expand_pattern = element.GetExpandCollapsePattern(timeout=timeout)

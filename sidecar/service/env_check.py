@@ -144,7 +144,7 @@ def set_dpi_awareness():
     except AttributeError:
         pass  # SetProcessDpiAwarenessContext not available (pre-RS2)
     except Exception as e:
-        logger.debug(f"SetProcessDpiAwarenessContext failed: {e}")
+        logger.debug("SetProcessDpiAwarenessContext failed: %s", e)
 
     try:
         # Fallback: Windows 8.1+
@@ -157,14 +157,23 @@ def set_dpi_awareness():
     except AttributeError:
         pass
     except Exception as e:
-        logger.debug(f"SetProcessDpiAwareness failed: {e}")
+        logger.debug("SetProcessDpiAwareness failed: %s", e)
 
     logger.warning("Could not set DPI awareness — screenshots may be misaligned on high-DPI displays")
     return False
 
 
+# Module-level DPI awareness cache (doesn't change at runtime)
+_dpi_awareness_cache: Optional[str] = None
+
+
 def _get_dpi_awareness() -> str:
-    """Get current DPI awareness level as a human-readable string."""
+    """Get current DPI awareness level as a human-readable string.
+    Cached at module level since it doesn't change at runtime."""
+    global _dpi_awareness_cache
+    if _dpi_awareness_cache is not None:
+        return _dpi_awareness_cache
+
     try:
         buf = ctypes.c_ulong()
         result = ctypes.windll.shcore.GetProcessDpiAwareness(
@@ -174,10 +183,12 @@ def _get_dpi_awareness() -> str:
         if result == 0:
             # 0 = DPI_UNAWARE, 1 = SYSTEM_DPI_AWARE, 2 = PER_MONITOR_DPI_AWARE
             awareness_map = {0: "Unaware", 1: "System-aware", 2: "Per-monitor"}
-            return awareness_map.get(buf.value, f"Unknown ({buf.value})")
+            _dpi_awareness_cache = awareness_map.get(buf.value, f"Unknown ({buf.value})")
+            return _dpi_awareness_cache
     except Exception:
         pass
-    return "Unknown"
+    _dpi_awareness_cache = "Unknown"
+    return _dpi_awareness_cache
 
 
 def _get_monitor_dpi_info() -> str:
