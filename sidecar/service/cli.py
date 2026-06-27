@@ -177,6 +177,33 @@ def run_perceive(args) -> int:
 def run_list(args) -> int:
     """List all visible windows."""
     windows = list_windows(min_size=(args.min_size, args.min_size))
+
+    # Machine-readable output for programmatic consumers (e.g. the desktop app's
+    # window picker). Pure JSON on stdout — the env report was routed to stderr.
+    if getattr(args, "json", False):
+        payload = [
+            {
+                "name": w.name or "",
+                "class_name": w.class_name or "",
+                "automation_id": w.automation_id or "",
+                "pid": w.process_id,
+                "bounding_box": (
+                    {
+                        "left": w.bounding_box.left,
+                        "top": w.bounding_box.top,
+                        "width": w.bounding_box.width,
+                        "height": w.bounding_box.height,
+                    }
+                    if w.bounding_box
+                    else None
+                ),
+                "is_enabled": w.is_enabled,
+            }
+            for w in windows
+        ]
+        print(json.dumps({"windows": payload}))
+        return 0
+
     if not windows:
         print("No visible windows found.")
         return 0
@@ -276,6 +303,8 @@ def main(argv=None):
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
     parser.add_argument("--json-logs", action="store_true", help="Structured JSON log output")
     parser.add_argument("--list", action="store_true", help="List all visible windows")
+    parser.add_argument("--json", action="store_true",
+                        help="Emit machine-readable JSON on stdout (env report goes to stderr)")
     parser.add_argument("--target", type=str, help="Window title (substring match)")
     parser.add_argument("--process", type=str, help="Process name (e.g. notepad.exe)")
     parser.add_argument("--class", dest="cls", type=str, help="Window class name")
@@ -311,10 +340,11 @@ def main(argv=None):
     args = parser.parse_args(argv)
     setup_logging(args.verbose, json_logs=args.json_logs)
 
-    # Environment check
+    # Environment check. In --json mode the env report must not pollute stdout
+    # (which carries the machine-readable payload), so route it to stderr.
     set_dpi_awareness()
     env = check_environment()
-    print(env.report())
+    print(env.report(), file=sys.stderr if args.json else sys.stdout)
 
     if not env.is_ok:
         logger.error("Environment check failed. Cannot proceed.")

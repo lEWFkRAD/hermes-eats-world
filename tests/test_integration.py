@@ -256,6 +256,30 @@ class TestCLI:
         assert result.returncode == 0
         assert "Notepad" in result.stdout
 
+    def test_cli_list_json(self, notepad):
+        """Verify --list --json emits pure, parseable JSON on stdout.
+
+        This is the contract the desktop window picker consumes, so stdout must
+        be valid JSON with the env report kept on stderr.
+        """
+        import json
+
+        result = subprocess.run(
+            [sys.executable, "-m", "sidecar.service", "--list", "--json"],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(Path(__file__).parent.parent),
+        )
+        assert result.returncode == 0, f"CLI failed: {result.stderr}"
+
+        data = json.loads(result.stdout)  # raises if stdout isn't pure JSON
+        assert "windows" in data and isinstance(data["windows"], list)
+
+        names = [w["name"] for w in data["windows"]]
+        assert any("Notepad" in (n or "") for n in names), names
+
+        sample = next(w for w in data["windows"] if w["name"])
+        assert set(sample) >= {"name", "class_name", "pid", "bounding_box", "is_enabled"}
+
     def test_cli_perceive_notepad(self, notepad):
         """Verify --target perceives Notepad by title."""
         title = _find_notepad_title()
