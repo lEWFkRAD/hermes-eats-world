@@ -5,6 +5,8 @@ Capture window screenshots using mss, with DPI-aware coordinate conversion.
 Outputs PNG files with timestamped names in the project directory.
 """
 
+import base64
+import io
 import logging
 import os
 import time
@@ -21,21 +23,11 @@ from ..service.env_check import logical_to_device
 logger = logging.getLogger(__name__)
 
 
-def capture_window(
+def _grab_window_image(
     bounding_box: BoundingBox,
     hwnd: Optional[int] = None,
-    output_dir: str = ".",
-) -> Optional[str]:
-    """Capture a screenshot of a window's bounding box.
-    
-    Args:
-        bounding_box: The window's UIA bounding rectangle.
-        hwnd: Optional HWND for DPI coordinate conversion.
-        output_dir: Directory to save the PNG file.
-    
-    Returns:
-        Path to the saved PNG, or None on failure.
-    """
+) -> Optional[Image.Image]:
+    """Grab a window's bounding box as a PIL Image (DPI-aware). None on failure."""
     # Convert logical → device coordinates
     if hwnd and hwnd != 0:
         left, top, width, height = logical_to_device(
@@ -58,6 +50,35 @@ def capture_window(
         "height": height,
     }
 
+    try:
+        with mss.MSS() as sct:
+            sct_img = sct.grab(monitor)
+        # Convert BGRA → RGB
+        return Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
+    except Exception as e:
+        logger.error("Screenshot grab failed: %s", e)
+        return None
+
+
+def capture_window(
+    bounding_box: BoundingBox,
+    hwnd: Optional[int] = None,
+    output_dir: str = ".",
+) -> Optional[str]:
+    """Capture a screenshot of a window's bounding box.
+
+    Args:
+        bounding_box: The window's UIA bounding rectangle.
+        hwnd: Optional HWND for DPI coordinate conversion.
+        output_dir: Directory to save the PNG file.
+
+    Returns:
+        Path to the saved PNG, or None on failure.
+    """
+    img = _grab_window_image(bounding_box, hwnd)
+    if img is None:
+        return None
+
     # Ensure output dir exists
     os.makedirs(output_dir, exist_ok=True)
 
@@ -65,17 +86,38 @@ def capture_window(
     output_path = Path(output_dir) / f"capture_{timestamp}.png"
 
     try:
-        with mss.MSS() as sct:
-            sct_img = sct.grab(monitor)
-        
-        # Convert BGRA → RGB
-        img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
         img.save(str(output_path), "PNG")
         logger.info("Saved screenshot to %s", output_path)
         return str(output_path)
-    
     except Exception as e:
-        logger.error("Screenshot capture failed: %s", e)
+        logger.error("Screenshot save failed: %s", e)
+        return None
+
+
+def capture_window_base64(
+    bounding_box: BoundingBox,
+    hwnd: Optional[int] = None,
+    max_width: Optional[int] = None,
+) -> Optional[str]:
+    """Capture a window as a base64 PNG data URL (no file on disk).
+
+    Used by the desktop live-preview panel, which polls this and renders the
+    image inline. `max_width` downscales the capture to keep the payload small
+    and the round-trip fast (preview quality, not pixel-perfect).
+    """
+    img = _grab_window_image(bounding_box, hwnd)
+    if img is None:
+        return None
+
+    try:
+        if max_width and img.width > max_width:
+            ratio = max_width / float(img.width)
+            img = img.resize((max_width, max(1, int(img.height * ratio))))
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception as e:
+        logger.error("Screenshot encode failed: %s", e)
         return None
 
 

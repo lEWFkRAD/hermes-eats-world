@@ -17,12 +17,13 @@ from .match import (
     template_match_image,
     find_text_region,
 )
-from .screenshot import capture_element, capture_window
+from .screenshot import capture_element, capture_window, capture_window_base64
 
 __all__ = [
     # Screenshot capture
     "capture_element",
     "capture_window",
+    "capture_window_base64",
     # OCR
     "OCRResult",
     "OCRWord",

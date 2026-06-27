@@ -23,7 +23,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..capture import capture_window
+from ..capture import capture_window, capture_window_base64
 from ..perception import classify_tier, element_to_dict, get_control_patterns, summarize_tree
 from ..schema import (
     SCHEMA_VERSION,
@@ -224,6 +224,39 @@ def run_list(args) -> int:
     return 0
 
 
+def run_capture(args) -> int:
+    """Capture the target window as a base64 PNG and print JSON.
+
+    Powers the desktop live-preview panel, which polls this. Captures the target
+    window's full bounding box (the visible app, no UWP drilling) downscaled to
+    --capture-width.
+    """
+    target_result = find_window(
+        title=args.target, process_name=args.process, class_name=args.cls, timeout=5,
+    )
+    if target_result is None:
+        query = args.target or args.process or args.cls or "unknown"
+        print(make_error("window_not_found", f"Could not find window matching '{query}'", target=query),
+              file=sys.stderr)
+        return 1
+
+    info = target_result.info
+    if not info.bounding_box:
+        print(make_error("no_bounds", "Target window has no bounding box"), file=sys.stderr)
+        return 1
+
+    data_url = capture_window_base64(info.bounding_box, info.hwnd, max_width=args.capture_width)
+    if not data_url:
+        print(make_error("capture_failed", "Screenshot capture failed"), file=sys.stderr)
+        return 1
+
+    print(json.dumps({
+        "image": data_url,
+        "target": {"name": info.name, "class_name": info.class_name, "pid": info.process_id},
+    }))
+    return 0
+
+
 def run_goal(args) -> int:
     """Execute the orchestrator: PERCEIVE → PLAN → ACT → VERIFY loop."""
     from ..orchestrator import Orchestrator, OrchestratorConfig
@@ -316,6 +349,11 @@ def main(argv=None):
                         help="Tree walk depth (max: 500). Default: 3 for --target perceive, "
                              "5 for --run-goal (deep enough for nested UWP apps).")
     parser.add_argument("--screenshot", action="store_true", help="Capture window screenshot")
+    parser.add_argument("--capture", action="store_true",
+                        help="Capture the target window as a base64 PNG and print JSON "
+                             "(for the desktop live-preview panel). Use with --target/--process.")
+    parser.add_argument("--capture-width", type=int, default=480,
+                        help="Max width (px) for --capture output (default: 480)")
     parser.add_argument("--output", type=str, help="Output file path (default: stdout)")
     parser.add_argument("--min-size", type=int, default=100, help="Minimum window size for --list (default: 100)")
 
@@ -362,6 +400,12 @@ def main(argv=None):
 
     if args.list:
         return run_list(args)
+
+    if args.capture:
+        if not any([args.target, args.process, args.cls]):
+            parser.error("--capture requires --target, --process, or --class")
+            return 2
+        return run_capture(args)
 
     if args.goal:
         # Orchestrator mode
