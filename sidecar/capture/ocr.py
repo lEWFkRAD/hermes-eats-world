@@ -108,7 +108,7 @@ class _PytesseractBackend:
                 confidence=round(conf, 3),
             )
 
-            line_num = data["text"][i]  # use line number grouping
+            line_num = data["line_num"][i]  # use actual line number grouping
             block_num = data["block_num"][i]
             line_key = (block_num, data["line_num"][i])
 
@@ -120,10 +120,13 @@ class _PytesseractBackend:
             line = line_map[line_key]
             line.words.append(word)
             line.text += (line.text + " ") + text if line.text else text
-            line.bbox.left = min(line.bbox.left, left)
-            line.bbox.top = min(line.bbox.top, top)
-            line.bbox.width = max(line.bbox.left + width, left + width) - line.bbox.left
-            line.bbox.height = max(line.bbox.height, height)
+            # Build new bbox instead of mutating frozen model
+            new_left = min(line.bbox.left, left)
+            new_top = min(line.bbox.top, top)
+            new_right = max(line.bbox.left + line.bbox.width, left + width)
+            new_bottom = new_top + max(line.bbox.height, height)
+            line.bbox = BoundingBox(left=new_left, top=new_top,
+                                    width=new_right - new_left, height=new_bottom - new_top)
 
         for line in line_map.values():
             if line.words:
@@ -417,6 +420,9 @@ _ocr_lock = threading.Lock()
 def get_ocr_engine(preferred_backend: Optional[str] = None) -> OCREngine:
     """Get the global OCR engine instance (lazy, thread-safe initialization)."""
     global _ocr_engine
+    if preferred_backend and _ocr_engine is not None and _ocr_engine._preferred_backend != preferred_backend:
+        # Force re-initialization if backend changed
+        _ocr_engine = None
     if _ocr_engine is not None:
         return _ocr_engine
     with _ocr_lock:

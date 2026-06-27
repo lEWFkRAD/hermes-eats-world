@@ -65,7 +65,7 @@ def capture_window(
     output_path = Path(output_dir) / f"capture_{timestamp}.png"
 
     try:
-        with mss.mss() as sct:
+        with mss.MSS() as sct:
             sct_img = sct.grab(monitor)
         
         # Convert BGRA → RGB

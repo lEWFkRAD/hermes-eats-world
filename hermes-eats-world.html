@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Eats World</title>
+<style>
+  :root{
+    --bg:#0d0f14; --bg2:#13161e; --panel:#171b25; --panel2:#1d222e;
+    --line:#2a3040; --ink:#e8ebf2; --mut:#8e97ad; --dim:#5b6479;
+    --gold:#e8c766; --gold2:#c9a227; --teal:#5fd2c2; --rose:#e98a7a; --grn:#7fcf8f;
+    --wing:#f0d98a;
+    --mono:'SF Mono',ui-monospace,'Cascadia Code',Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;
+    background-image:radial-gradient(900px 500px at 80% -5%,rgba(232,199,102,.07),transparent),
+                     radial-gradient(700px 400px at -10% 30%,rgba(95,210,194,.05),transparent);}
+  .wrap{max-width:980px;margin:0 auto;padding:0 22px}
+  section{padding:54px 0;border-top:1px solid var(--line)}
+  section:first-of-type{border-top:none}
+  h2{font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin:0 0 6px;font-weight:600}
+  .lead{color:var(--mut);font-size:15px;margin:0 0 28px;max-width:62ch}
+  a{color:var(--teal)}
+
+  /* HERO */
+  .hero{padding:88px 0 60px;text-align:center;position:relative;overflow:hidden}
+  .wing{font-size:48px;filter:drop-shadow(0 0 22px rgba(232,199,102,.45));animation:bob 4s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+  .hero h1{font-size:clamp(38px,8vw,76px);margin:8px 0 4px;font-weight:800;letter-spacing:-.02em;
+    background:linear-gradient(100deg,var(--wing),#fff 45%,var(--teal));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero .sub{color:var(--mut);font-size:17px;max-width:54ch;margin:14px auto 0}
+  .badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+  .badge{font-family:var(--mono);font-size:12px;color:var(--gold);background:rgba(232,199,102,.08);
+    border:1px solid rgba(232,199,102,.25);padding:5px 11px;border-radius:20px}
+
+  /* STAT COUNTERS */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:8px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 16px;text-align:center}
+  .stat .n{font-size:34px;font-weight:800;color:var(--wing);font-family:var(--mono);line-height:1}
+  .stat .l{font-size:12px;color:var(--mut);margin-top:7px;letter-spacing:.04em}
+  @media(max-width:680px){.stats{grid-template-columns:repeat(2,1fr)}}
+
+  /* CALLOUT */
+  .why{background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);
+    border-left:3px solid var(--gold);border-radius:14px;padding:26px 28px}
+  .why p{margin:0 0 12px;font-size:16px}
+  .why p:last-child{margin-bottom:0}
+  .why b{color:var(--wing)}
+
+  /* LOOP */
+  .loop{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin:6px 0 20px}
+  .node{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 18px;cursor:pointer;
+    min-width:118px;text-align:center;transition:.25s;user-select:none}
+  .node:hover{transform:translateY(-3px);border-color:var(--gold)}
+  .node.on{border-color:var(--gold);background:rgba(232,199,102,.1);box-shadow:0 0 0 1px var(--gold) inset}
+  .node .t{font-weight:700;font-size:14px;letter-spacing:.04em}
+  .node .s{font-size:11px;color:var(--dim);font-family:var(--mono);margin-top:2px}
+  .arr{color:var(--dim);font-size:18px}
+  .loopinfo{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;min-height:74px}
+  .loopinfo h4{margin:0 0 4px;color:var(--gold);font-size:14px}
+  .loopinfo p{margin:0;color:var(--mut);font-size:14px}
+  @media(max-width:680px){.arr{transform:rotate(90deg)}.node{min-width:0;flex:1}}
+
+  /* PALETTE DEMO */
+  .demo{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:680px){.demo{grid-template-columns:1fr}}
+  .pal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+  .pal .cap{font-size:12px;color:var(--dim);font-family:var(--mono);margin-bottom:12px}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .pbtn{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px 10px;text-align:center;
+    cursor:pointer;font-size:16px;font-weight:600;transition:.18s}
+  .pbtn:hover{border-color:var(--teal);transform:translateY(-2px)}
+  .pbtn.on{border-color:var(--gold);background:rgba(232,199,102,.12);color:var(--wing)}
+  .pbtn .ico{font-size:24px;display:block;margin-bottom:4px}
+  .runner{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;font-family:var(--mono);font-size:13px}
+  .runner .cap{font-size:12px;color:var(--dim);margin-bottom:12px}
+  .step{padding:9px 12px;margin:7px 0;border-radius:9px;background:var(--panel2);border:1px solid var(--line);
+    color:var(--mut);opacity:.35;transform:translateX(-6px);transition:.3s}
+  .step.show{opacity:1;transform:none;color:var(--ink);border-color:rgba(95,210,194,.4)}
+  .step.done{color:var(--grn)}
+  .step .k{color:var(--teal)}
+  .confirm{margin-top:10px;padding:12px;border-radius:9px;background:rgba(232,199,102,.08);border:1px solid var(--gold);
+    display:none}
+  .confirm.show{display:block}
+  .confirm .q{color:var(--wing);font-family:var(--sans);font-size:14px;margin-bottom:8px}
+  .cbtns{display:flex;gap:8px}
+  .cbtns button{flex:1;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--ink);cursor:pointer;font-family:var(--sans);font-weight:600;font-size:13px}
+  .cbtns .yes{background:var(--grn);color:#0c1a0f;border-color:var(--grn)}
+  .doneflag{margin-top:10px;color:var(--grn);font-family:var(--sans);display:none}
+  .doneflag.show{display:block}
+
+  /* MODULES */
+  .mods{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:680px){.mods{grid-template-columns:1fr}}
+  .mod{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 18px;cursor:pointer;transition:.2s}
+  .mod:hover{border-color:var(--gold)}
+  .mod .h{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .mod .nm{font-weight:700;font-size:15px}
+  .mod .nm .ico{margin-right:8px}
+  .mod .pill{font-size:10px;font-family:var(--mono);padding:3px 8px;border-radius:20px;white-space:nowrap}
+  .pill.ok{color:var(--grn);background:rgba(127,207,143,.12);border:1px solid rgba(127,207,143,.3)}
+  .pill.part{color:var(--gold);background:rgba(232,199,102,.1);border:1px solid rgba(232,199,102,.3)}
+  .pill.no{color:var(--dim);background:rgba(91,100,121,.12);border:1px solid var(--line)}
+  .mod .body{max-height:0;overflow:hidden;transition:.32s;color:var(--mut);font-size:13.5px}
+  .mod.open .body{max-height:240px;margin-top:11px}
+  .mod .body code{font-family:var(--mono);color:var(--teal);font-size:12px}
+
+  /* TIMELINE */
+  .tl{position:relative;padding-left:24px}
+  .tl::before{content:'';position:absolute;left:6px;top:4px;bottom:4px;width:2px;background:var(--line)}
+  .ev{position:relative;padding:0 0 18px}
+  .ev::before{content:'';position:absolute;left:-22px;top:5px;width:11px;height:11px;border-radius:50%;
+    background:var(--bg);border:2px solid var(--gold2)}
+  .ev.feat::before{background:var(--gold);border-color:var(--gold)}
+  .ev .sha{font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .ev .msg{font-size:14px}
+  .ev .tag{font-family:var(--mono);font-size:11px;color:var(--teal)}
+
+  footer{padding:40px 0 60px;text-align:center;color:var(--dim);font-size:13px}
+  footer .wing{font-size:22px;animation:none;display:inline-block}
+  .reveal{opacity:0;transform:translateY(16px);transition:.6s}
+  .reveal.in{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="wing">🪽</div>
+    <h1>Hermes Eats World</h1>
+    <div class="sub">A Windows automation sidecar that presses the buttons a person can't remember how to find.</div>
+    <div class="badges">
+      <span class="badge">Python 3.11</span>
+      <span class="badge">UI Automation</span>
+      <span class="badge">built autonomously</span>
+      <span class="badge">~8 hours</span>
+      <span class="badge">2026-06-26</span>
+    </div>
+  </div>
+</header>
+
+<section class="reveal">
+  <div class="wrap">
+    <div class="stats">
+      <div class="stat"><div class="n" data-to="5359">0</div><div class="l">lines of Python</div></div>
+      <div class="stat"><div class="n" data-to="31">0</div><div class="l">source files</div></div>
+      <div class="stat"><div class="n" data-to="9">0</div><div class="l">modules</div></div>
+      <div class="stat"><div class="n" data-to="10">0</div><div class="l">clean commits</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="reveal">
+  <div class="wrap">
+    <h2>Why it exists</h2>
+    <div class="why">
+      <p>The reviewer on a bookkeeping engagement — <b>Chris</b> — had a stroke. His hands and his words are fine. What's gone is <b>procedural recall</b>: he knows what he wants ("print this"), but he can't remember the menu paths and steps to get there anymore.</p>
+      <p>So the goal was never a clever tool. It was a <b>recognition-over-recall</b> interface: don't make Chris remember the verbs — show them to him. He presses <b>Print</b>; Hermes remembers the menu so he doesn't have to.</p>
+      <p>The quietly good part: a tool meant to do tasks for someone who can't — was itself <b>built by an agent, running unattended, while no one sat at the desk.</b> "Not bad for 9 hours at a pc" meant the machine's nine hours, not a person's.</p>
+    </div>
+  </div>
+</section>
+
+<section class="reveal">
+  <div class="wrap">
+    <h2>The loop</h2>
+    <p class="lead">Every goal runs the same four-beat cycle. Tap a stage.</p>
+    <div class="loop" id="loop">
+      <div class="node on" data-i="0"><div class="t">PERCEIVE</div><div class="s">read the UI</div></div>
+      <span class="arr">→</span>
+      <div class="node" data-i="1"><div class="t">PLAN</div><div class="s">intent→steps</div></div>
+      <span class="arr">→</span>
+      <div class="node" data-i="2"><div class="t">ACT</div><div class="s">click / type</div></div>
+      <span class="arr">→</span>
+      <div class="node" data-i="3"><div class="t">VERIFY</div><div class="s">did it work?</div></div>
+    </div>
+    <div class="loopinfo" id="loopinfo"></div>
+  </div>
+</section>
+
+<section class="reveal">
+  <div class="wrap">
+    <h2>What it's for</h2>
+    <p class="lead">The vision for Chris, made concrete. Press a task on the left — watch Hermes run the recipe he can't remember, and stop to confirm before anything happens for real.</p>
+    <div class="demo">
+      <div class="pal">
+        <div class="cap"># launcher palette — recognition, not recall</div>
+        <div class="btns" id="btns">
+          <div class="pbtn" data-task="print"><span class="ico">🖨️</span>Print</div>
+          <div class="pbtn" data-task="save"><span class="ico">💾</span>Save</div>
+          <div class="pbtn" data-task="bigger"><span class="ico">🔍</span>Bigger text</div>
+          <div class="pbtn" data-task="email"><span class="ico">✉️</span>Email this</div>
+        </div>
+      </div>
+      <div class="runner">
+        <div class="cap" id="rcap"># pick a task →</div>
+        <div id="steps"></div>
+        <div class="confirm" id="confirm">
+          <div class="q" id="cq"></div>
+          <div class="cbtns">
+            <button class="yes" id="cyes">Yes, do it</button>
+            <button id="cno">Cancel</button>
+          </div>
+        </div>
+        <div class="doneflag" id="doneflag">✓ Done — and Chris can see that it worked.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="reveal">
+  <div class="wrap">
+    <h2>Under the hood</h2>
+    <p class="lead">Nine modules, two perception tiers, one orchestrator. Tap any card.</p>
+    <div class="mods" id="mods">
+      <div class="mod"><div class="h"><span class="nm"><span class="ico">🌳</span>perception</span><span class="pill ok">working</span></div>
+        <div class="body">UIA tree walk with COM-hang timeouts (<code>5s/element, 30s total</code> via ThreadPoolExecutor), tier classifier (T1/T2/T3), and a state-delta detector that diffs two snapshots.</div></div>
+      <div class="mod"><div class="h"><span class="nm"><span class="ico">🎯</span>target</span><span class="pill ok">working</span></div>
+        <div class="body">Find windows by title, process, or class. Drills <code>ApplicationFrameWindow</code> children for UWP apps, with a fallback path.</div></div>
+      <div class="mod"><div class="h"><span class="nm"><span class="ico">👆</span>action · T1</span><span class="pill ok">working</span></div>
+        <div class="body">Accessibility-native actions: <code>invoke_element()</code>, <code>set_value()</code>, <code>select_item()</code> via UIA patterns. No pixels — it talks to the controls directly.</div></div>
+      <div class="mod"><div class="h"><span class="nm"><span class="ico">📷</span>capture · T2</span><span class="pill part">OCR stubbed</span></div>
+        <div class="body">Screenshot via mss, DPI-aware NCC template matching, SendInput synthesis for click/type. OCR engine is built but <code>backend='none'</code> — tesseract binary missing, degrades gracefully.</div></div>
+      <div class="mod"><div class="h"><span class="nm"><span class="ico">🧭</span>orchestrator</span><span class="pill ok">working</span></div>
+        <div class="body">Regex intent planner → PERCEIVE→PLAN→ACT→VERIFY executor → retry/fallback/abort recovery. Smoke-tested driving Notepad: "type hello world" in 1.3s, 43 elements seen.</div></div>
+      <div class="mod"><div class="h"><span class="nm"><span class="ico">⚙️</span>service</span><span class="pill ok">working</span></div>
+        <div class="body">CLI (<code>--run-goal</code>, <code>--list</code>, <code>--screenshot</code>…), unified <code>perceive_target()</code> API, structured JSON logging, environment/DPI/elevation checks.</div></div>
+      <div class="mod"><div class="h"><span class="nm"><span class="ico">🧬</span>schema</span><span class="pill ok">working</span></div>
+        <div class="body">Pydantic models + JSON encoder, versioned <code>v1.0.0</code> from the very first commit — schema evolution without breaking downstream consumers.</div></div>
+      <div class="mod"><div class="h"><span class="nm"><span class="ico">✅</span>verify</span><span class="pill no">empty — next</span></div>
+        <div class="body">The missing V in the loop. Delta detection lives in <code>perception/delta.py</code>, but the formal pre/post-assertion module is still an empty folder. For Chris this is the "did it actually work, and can he tell?" layer — so it's the next thing that matters.</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="reveal">
+  <div class="wrap">
+    <h2>The build, commit by commit</h2>
+    <p class="lead">14:25 → 22:42, unattended. Two adversary review rounds caught real bugs along the way.</p>
+    <div class="tl">
+      <div class="ev feat"><div class="sha">6d3a4db · 14:25</div><div class="msg">phase 0 perception spike + sprint 1 foundation</div></div>
+      <div class="ev"><div class="sha">904e7a3</div><div class="msg">bridge layer, COM timeouts, tree input fixes</div></div>
+      <div class="ev"><div class="sha">1d30056</div><div class="msg">DPI calibration + UWP frame drilling fallback</div></div>
+      <div class="ev"><div class="sha">dd3e185</div><div class="msg">calibrate tier thresholds against 6 real apps</div></div>
+      <div class="ev feat"><div class="sha">32a8545</div><div class="msg">T2 vision fallback — OCR + template match + actions</div></div>
+      <div class="ev feat"><div class="sha">e1f7e3b</div><div class="msg">unified service API, structured logging, state delta</div></div>
+      <div class="ev"><div class="sha">05f85d2</div><div class="msg">adversary board #1 — Critical + High findings <span class="tag">9 valid / 86</span></div></div>
+      <div class="ev"><div class="sha">398ce95</div><div class="msg">remaining findings + credential cleanup <span class="tag">7 fixed</span></div></div>
+      <div class="ev"><div class="sha">477f5ba</div><div class="msg">sprint 3 handoff — AAR + markdown</div></div>
+      <div class="ev feat"><div class="sha">dab2f1e · 22:42</div><div class="msg">orchestrator, CLI integration, tree walker fixes</div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="wing">🪽</div>
+    <p>Hermes Eats World · a sidecar built to carry the steps, so Chris only has to carry the intent.</p>
+  </div>
+</footer>
+
+<script>
+  // stat counters
+  function runCounters(){
+    document.querySelectorAll('.stat .n').forEach(el=>{
+      const to=+el.dataset.to, dur=1100, t0=performance.now();
+      (function tick(t){
+        const p=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-p,3);
+        el.textContent=Math.round(to*e).toLocaleString();
+        if(p<1)requestAnimationFrame(tick);
+      })(t0);
+    });
+  }
+  // reveal on scroll
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{
+    if(e.isIntersecting){e.target.classList.add('in');
+      if(e.target.querySelector('.stat'))runCounters();
+      io.unobserve(e.target);}
+  })},{threshold:.18});
+  document.querySelectorAll('.reveal').forEach(s=>io.observe(s));
+
+  // loop
+  const LOOP=[
+    {h:'PERCEIVE — read the UI as data',p:'Walk the accessibility tree of the target window. Real control names and values, not a screenshot guess. Times out gracefully so a hung app can\'t freeze the agent.'},
+    {h:'PLAN — turn intent into steps',p:'A small, predictable regex catalog maps "print" to an exact action sequence. Deliberately not a clever LLM — Chris needs the same task to work the same way every time.'},
+    {h:'ACT — click and type for him',p:'T1 fires UIA patterns directly on the controls; T2 falls back to template-matched clicks and synthesized keystrokes. The targeting Chris struggles with happens automatically.'},
+    {h:'VERIFY — confirm it worked',p:'Diff the before/after state and surface a plain confirmation. The safety beat: nothing important happens silently, and Chris can see the result.'}
+  ];
+  const nodes=[...document.querySelectorAll('#loop .node')], li=document.getElementById('loopinfo');
+  function showLoop(i){
+    nodes.forEach(n=>n.classList.toggle('on',+n.dataset.i===i));
+    li.innerHTML='<h4>'+LOOP[i].h+'</h4><p>'+LOOP[i].p+'</p>';
+  }
+  nodes.forEach(n=>n.addEventListener('click',()=>showLoop(+n.dataset.i)));
+  showLoop(0);
+
+  // modules
+  document.querySelectorAll('#mods .mod').forEach(m=>m.addEventListener('click',()=>m.classList.toggle('open')));
+
+  // palette demo
+  const RECIPES={
+    print:{cap:'# goal: "print this"',q:'Print to Office Jet — yes?',
+      steps:[['press','Ctrl + P'],['perceive','print dialog appears'],['set','printer = Office Jet'],['invoke','Print button']]},
+    save:{cap:'# goal: "save this"',q:'Save changes to the open file — yes?',
+      steps:[['press','Ctrl + S'],['perceive','no save-as dialog → already named'],['verify','title bar dot cleared']]},
+    bigger:{cap:'# goal: "make the text bigger"',q:'Zoom to 150% — yes?',
+      steps:[['press','Ctrl + +'],['press','Ctrl + +'],['perceive','zoom = 150%']]},
+    email:{cap:'# goal: "email this"',q:'Open a new email with this attached — yes?',
+      steps:[['invoke','File → Share → Email'],['perceive','mail compose window'],['set','attach current document']]}
+  };
+  const stepsEl=document.getElementById('steps'), rcap=document.getElementById('rcap'),
+        confirm=document.getElementById('confirm'), cq=document.getElementById('cq'),
+        doneflag=document.getElementById('doneflag');
+  let timers=[];
+  function clearRun(){timers.forEach(clearTimeout);timers=[];confirm.classList.remove('show');doneflag.classList.remove('show');}
+  function run(task){
+    clearRun();
+    const r=RECIPES[task]; rcap.textContent=r.cap; stepsEl.innerHTML='';
+    const els=r.steps.map(s=>{
+      const d=document.createElement('div'); d.className='step';
+      d.innerHTML='<span class="k">'+s[0]+'</span> · '+s[1]; stepsEl.appendChild(d); return d;
+    });
+    els.forEach((d,i)=>{
+      timers.push(setTimeout(()=>{d.classList.add('show');},350*(i+1)));
+      timers.push(setTimeout(()=>{d.classList.add('done');},350*(i+1)+260));
+    });
+    timers.push(setTimeout(()=>{cq.textContent=r.q;confirm.classList.add('show');},350*(els.length+1)));
+  }
+  document.querySelectorAll('#btns .pbtn').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('#btns .pbtn').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); run(b.dataset.task);
+  }));
+  document.getElementById('cyes').addEventListener('click',()=>{confirm.classList.remove('show');doneflag.classList.add('show');});
+  document.getElementById('cno').addEventListener('click',()=>{confirm.classList.remove('show');
+    document.querySelectorAll('#btns .pbtn').forEach(x=>x.classList.remove('on'));rcap.textContent='# cancelled — nothing happened';stepsEl.innerHTML='';});
+</script>
+</body>
+</html>

@@ -5,7 +5,10 @@ T2 actions: Vision-guided input synthesis (SendInput / PostMessage).
 """
 
 from .t1_invoke import invoke_pattern, set_value, toggle_state
-from .t2_synthesize import click_at, type_text, post_message
+from .t2_synthesize import (
+    click_at, type_text, post_message, double_click_at,
+    right_click_at, hover_at, drag, scroll_at,
+)
 
 __all__ = [
     # T1 actions
@@ -16,4 +19,9 @@ __all__ = [
     "click_at",
     "type_text",
     "post_message",
+    "double_click_at",
+    "right_click_at",
+    "hover_at",
+    "drag",
+    "scroll_at",
 ]

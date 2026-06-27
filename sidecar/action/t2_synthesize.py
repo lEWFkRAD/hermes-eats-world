@@ -308,3 +308,177 @@ def double_click_at(hwnd: int, x: int, y: int,
         return False
     time.sleep(0.15)  # Double-click interval
     return click_at(hwnd, x, y, client_coords=client_coords)
+
+
+def right_click_at(hwnd: int, x: int, y: int,
+                   client_coords: bool = False) -> bool:
+    """Right-click at a specific coordinate.
+
+    Args:
+        hwnd: Target window handle.
+        x, y: Coordinates.
+        client_coords: If True, x/y are in client coordinates.
+
+    Returns:
+        True if the right-click was sent successfully.
+    """
+    return click_at(hwnd, x, y, button="right", client_coords=client_coords)
+
+
+def hover_at(hwnd: int, x: int, y: int,
+             client_coords: bool = False, duration: float = 0.1) -> bool:
+    """Move mouse to a position without clicking (hover).
+
+    Useful for triggering tooltips, hover states, or focus changes.
+
+    Args:
+        hwnd: Target window handle.
+        x, y: Coordinates.
+        client_coords: If True, x/y are in client coordinates.
+        duration: How long to hold the hover (seconds).
+
+    Returns:
+        True if the hover was sent successfully.
+    """
+    if client_coords:
+        x, y = client_to_screen(hwnd, x, y)
+
+    ax, ay = _absolute_coords(x, y)
+
+    inp = _INPUT()
+    inp.type = INPUT_MOUSE
+    inp.u.mi.dx = ax
+    inp.u.mi.dy = ay
+    inp.u.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE
+    if not _send_input(inp):
+        return False
+
+    time.sleep(duration)
+
+    logger.info("T2 hover at (%d, %d) on hwnd=%d for %.2fs", x, y, hwnd, duration)
+    return True
+
+
+def drag(hwnd: int, x1: int, y1: int, x2: int, y2: int,
+         button: str = "left", client_coords: bool = False,
+         steps: int = 5, step_delay: float = 0.02) -> bool:
+    """Drag from one point to another.
+
+    Moves mouse to start, presses button, interpolates to end, releases.
+
+    Args:
+        hwnd: Target window handle.
+        x1, y1: Start coordinates.
+        x2, y2: End coordinates.
+        button: "left" or "right" mouse button.
+        client_coords: If True, x/y are in client coordinates.
+        steps: Number of interpolation steps (smoother drag).
+        step_delay: Delay between steps in seconds.
+
+    Returns:
+        True if the drag completed successfully.
+    """
+    if client_coords:
+        x1, y1 = client_to_screen(hwnd, x1, y1)
+        x2, y2 = client_to_screen(hwnd, x2, y2)
+
+    if button == "left":
+        down_flags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN
+        up_flags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP
+    else:
+        down_flags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_RIGHTDOWN
+        up_flags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_RIGHTUP
+
+    # Move to start position
+    ax1, ay1 = _absolute_coords(x1, y1)
+    inp = _INPUT()
+    inp.type = INPUT_MOUSE
+    inp.u.mi.dx = ax1
+    inp.u.mi.dy = ay1
+    inp.u.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE
+    if not _send_input(inp):
+        return False
+
+    time.sleep(0.02)
+
+    # Button down
+    inp.u.mi.dwFlags = down_flags
+    if not _send_input(inp):
+        return False
+
+    time.sleep(0.02)
+
+    # Interpolate and move
+    ax2, ay2 = _absolute_coords(x2, y2)
+    for i in range(1, steps + 1):
+        t = i / steps  # 0.0 to 1.0
+        cx = int(ax1 + (ax2 - ax1) * t)
+        cy = int(ay1 + (ay2 - ay1) * t)
+        inp.u.mi.dx = cx
+        inp.u.mi.dy = cy
+        inp.u.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE
+        if not _send_input(inp):
+            return False
+        time.sleep(step_delay)
+
+    # Button up
+    inp.u.mi.dwFlags = up_flags
+    if not _send_input(inp):
+        return False
+
+    logger.info("T2 drag (%d,%d) -> (%d,%d) on hwnd=%d", x1, y1, x2, y2, hwnd)
+    return True
+
+
+MOUSEEVENTF_WHEEL = 0x0800
+MOUSEEVENTF_HWHEEL = 0x0100
+WHEEL_DELTA = 120
+
+
+def scroll_at(hwnd: int, x: int, y: int,
+              delta: int = 120, direction: str = "vertical",
+              client_coords: bool = False) -> bool:
+    """Scroll at a specific coordinate.
+
+    Args:
+        hwnd: Target window handle.
+        x, y: Scroll center coordinates.
+        delta: Scroll amount. Positive = up/right, negative = down/left.
+               Default WHEEL_DELTA (120) = one scroll tick.
+        direction: "vertical" or "horizontal".
+        client_coords: If True, x/y are in client coordinates.
+
+    Returns:
+        True if the scroll was sent successfully.
+    """
+    if client_coords:
+        x, y = client_to_screen(hwnd, x, y)
+
+    ax, ay = _absolute_coords(x, y)
+
+    # Move to the scroll target first
+    inp = _INPUT()
+    inp.type = INPUT_MOUSE
+    inp.u.mi.dx = ax
+    inp.u.mi.dy = ay
+    inp.u.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE
+    if not _send_input(inp):
+        return False
+
+    time.sleep(0.02)
+
+    # Send wheel event
+    if direction == "horizontal":
+        flags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_HWHEEL
+    else:
+        flags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_WHEEL
+
+    inp.u.mi.dx = ax
+    inp.u.mi.dy = ay
+    inp.u.mi.mouseData = delta
+    inp.u.mi.dwFlags = flags
+    if not _send_input(inp):
+        return False
+
+    logger.info("T2 scroll %s delta=%d at (%d,%d) on hwnd=%d", direction, delta, x, y, hwnd)
+    return True

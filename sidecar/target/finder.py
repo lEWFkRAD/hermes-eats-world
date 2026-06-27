@@ -43,8 +43,14 @@ def _pid_to_process_name(pid: int) -> str:
         if not handle:
             return ""
         try:
-            name = ctypes.create_unicode_buffer(260)
-            kernel.QueryFullProcessImageNameW(handle, 0, name)
+            size = ctypes.c_ulong(260)
+            name = ctypes.create_unicode_buffer(size.value)
+            # QueryFullProcessImageNameW requires lpdwSize (in/out) as the 4th
+            # argument; omitting it makes the call fail and yields an empty name.
+            if not kernel.QueryFullProcessImageNameW(
+                handle, 0, name, ctypes.byref(size)
+            ):
+                return ""
             # Return just the basename
             return name.value.split("\\")[-1]
         finally:
@@ -87,7 +93,7 @@ def find_window(
             try:
                 pid = w.ProcessId
                 actual_name = _pid_to_process_name(pid)
-                if actual_name.lower() == process_name.lower():
+                if process_name.lower() in actual_name.lower():
                     return WindowTarget(
                         info=_make_target_info(w),
                         control=w,

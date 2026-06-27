@@ -56,6 +56,27 @@ def setup_logging(verbose: bool = False, json_logs: bool = False):
         setup_console_logging(verbose=verbose)
 
 
+def run_serve(args) -> int:
+    """Start the WebSocket server."""
+    from .websocket_server import WebSocketServer
+
+    server = WebSocketServer(
+        host="127.0.0.1",
+        port=args.ws_port,
+        token=args.ws_token,
+    )
+
+    print(f"Starting WebSocket server on ws://127.0.0.1:{args.ws_port}")
+    if args.ws_token:
+        print("Auth token: ENABLED")
+
+    try:
+        server.run_forever()
+    except KeyboardInterrupt:
+        print("\nServer stopped.")
+    return 0
+
+
 def run_perceive(args) -> int:
     """Execute the PERCEIVE pipeline: find window → walk tree → classify → output."""
     start = time.time()
@@ -233,8 +254,22 @@ def run_goal(args) -> int:
 from ..orchestrator import ExecutionStatus, StepStatus
 
 
+def _force_utf8_stdio():
+    """Ensure stdout/stderr can emit non-ASCII glyphs (⚠ ✓ ✗ ✅) even when
+    redirected. On Windows, a piped stdout defaults to cp1252, which raises
+    UnicodeEncodeError on these characters (e.g. under subprocess capture)."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def main(argv=None):
     """Main CLI entry point."""
+    _force_utf8_stdio()
     parser = argparse.ArgumentParser(
         description="Hermes Eats World — Windows UI perception sidecar",
     )
@@ -265,6 +300,14 @@ def main(argv=None):
     parser.add_argument("--no-verify", action="store_true",
                         help="Skip verification after each step")
 
+    # WebSocket server options
+    parser.add_argument("--serve", action="store_true",
+                        help="Start WebSocket server")
+    parser.add_argument("--ws-port", type=int, default=8765,
+                        help="WebSocket server port (default: 8765)")
+    parser.add_argument("--ws-token", type=str, default=None,
+                        help="WebSocket auth token")
+
     args = parser.parse_args(argv)
     setup_logging(args.verbose, json_logs=args.json_logs)
 
@@ -278,6 +321,9 @@ def main(argv=None):
         return 1
 
     # Route to command
+    if args.serve:
+        return run_serve(args)
+
     if args.list:
         return run_list(args)
 

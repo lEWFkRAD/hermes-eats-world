@@ -26,7 +26,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Union
 
-from ..capture.screenshot import capture_window
 from ..perception import (
     classify_tier, element_to_dict, get_control_patterns, summarize_tree,
     PER_ELEMENT_TIMEOUT, TOTAL_TREE_TIMEOUT,
@@ -191,6 +190,7 @@ def perceive_target(
     # 6. Screenshot (optional)
     screenshot_path = None
     if screenshot and target_info.bounding_box:
+        from ..capture.screenshot import capture_window
         screenshot_path = capture_window(
             target_info.bounding_box,
             target_info.hwnd,
