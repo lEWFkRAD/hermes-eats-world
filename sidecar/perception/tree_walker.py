@@ -95,7 +95,7 @@ def _get_control_patterns(element) -> Optional[Dict[str, Any]]:
                 if hasattr(element, f"Get{pattern_name}Pattern"):
                     pat = getattr(element, f"Get{pattern_name}Pattern")()
                     if pat is not None:
-                        patterns[pattern_name] = True
+                        patterns[pattern_name] = {"supported": True}
             except Exception:
                 pass
         return patterns if patterns else None
@@ -129,7 +129,10 @@ def element_to_dict(
     truncated = False
 
     # Extract patterns for THIS element (not inherited from parent)
-    elem_patterns = from_patterns if depth == 0 else _get_control_patterns(element)
+    if depth == 0:
+        elem_patterns = from_patterns or {}
+    else:
+        elem_patterns = _get_control_patterns(element) or {}
 
     # Build element dict
     elem = Element(

@@ -176,6 +176,63 @@ def run_list(args) -> int:
     return 0
 
 
+def run_goal(args) -> int:
+    """Execute the orchestrator: PERCEIVE → PLAN → ACT → VERIFY loop."""
+    from ..orchestrator import Orchestrator, OrchestratorConfig
+
+    config = OrchestratorConfig(
+        max_steps=args.max_steps,
+        max_wait_seconds=args.timeout,
+        step_timeout=args.step_timeout,
+        retry_count=args.retries,
+        retry_delay=args.retry_delay,
+        require_verification=not args.no_verify,
+        perception_depth=args.depth,
+    )
+
+    orchestrator = Orchestrator(config=config)
+
+    logger.info("GOAL: %s", args.goal)
+    logger.info("Target: title=%s, process=%s, class=%s", args.target, args.process, args.cls)
+
+    result = orchestrator.run(
+        goal=args.goal,
+        target_title=args.target,
+        target_process=args.process,
+        target_class=args.cls,
+    )
+
+    # Print results
+    print(f"\n{'='*60}")
+    print(f"ORCHESTRATOR RESULT")
+    print(f"{'='*60}")
+    print(f"Goal:        {result.goal}")
+    print(f"Status:      {result.status.value}")
+    print(f"Steps:       {result.steps_completed}/{result.steps_total}")
+    print(f"Elapsed:     {result.elapsed:.1f}s")
+
+    if result.step_results:
+        print(f"\nStep Details:")
+        print(f"{'-'*60}")
+        for sr in result.step_results:
+            status_icon = "✓" if sr.status == StepStatus.SUCCESS else "✗"
+            print(f"  {status_icon} Step {sr.id}: {sr.description}")
+            print(f"    Status: {sr.status.value} ({sr.duration:.1f}s)")
+            if sr.error:
+                print(f"    Error: {sr.error}")
+
+    if result.error:
+        print(f"\nError: {result.error}")
+
+    print(f"{'='*60}\n")
+
+    return 0 if result.status == ExecutionStatus.SUCCESS else 1
+
+
+# Import enums for run_goal
+from ..orchestrator import ExecutionStatus, StepStatus
+
+
 def main(argv=None):
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -191,6 +248,22 @@ def main(argv=None):
     parser.add_argument("--screenshot", action="store_true", help="Capture window screenshot")
     parser.add_argument("--output", type=str, help="Output file path (default: stdout)")
     parser.add_argument("--min-size", type=int, default=100, help="Minimum window size for --list (default: 100)")
+
+    # Orchestrator options
+    parser.add_argument("--run-goal", type=str, dest="goal",
+                        help="Run orchestrator with a goal (e.g. 'click the Save button')")
+    parser.add_argument("--max-steps", type=int, default=20,
+                        help="Max steps for orchestrator (default: 20)")
+    parser.add_argument("--timeout", type=float, default=300.0,
+                        help="Total timeout for orchestrator in seconds (default: 300)")
+    parser.add_argument("--step-timeout", type=float, default=15.0,
+                        help="Timeout per step in seconds (default: 15)")
+    parser.add_argument("--retries", type=int, default=2,
+                        help="Retries per failed step (default: 2)")
+    parser.add_argument("--retry-delay", type=float, default=1.0,
+                        help="Delay between retries in seconds (default: 1.0)")
+    parser.add_argument("--no-verify", action="store_true",
+                        help="Skip verification after each step")
 
     args = parser.parse_args(argv)
     setup_logging(args.verbose, json_logs=args.json_logs)
@@ -208,9 +281,16 @@ def main(argv=None):
     if args.list:
         return run_list(args)
 
+    if args.goal:
+        # Orchestrator mode
+        if not any([args.target, args.process, args.cls]):
+            parser.error("--run-goal requires --target, --process, or --class")
+            return 2
+        return run_goal(args)
+
     # PERCEIVE requires a target
     if not any([args.target, args.process, args.cls]):
-        parser.error("Specify --list, --target <title>, --process <name>, or --class <class>")
+        parser.error("Specify --list, --target <title>, --process <name>, --class <class>, or --run-goal")
         return 2
 
     return run_perceive(args)
