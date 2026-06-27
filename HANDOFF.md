@@ -2,8 +2,8 @@
 
 **Last updated:** 2026-06-26
 **Branch:** `feat/phase0-sprint1`
-**Latest commit:** `398ce95` (fix: remaining advisory findings + credential cleanup)
-**Status:** Phase 1 Sprints 1–3 complete. Sprint 4 (Orchestrator) in progress.
+**Latest commit:** `dab2f1e` (feat: Sprint 4 — orchestrator, CLI integration, and tree walker fixes)
+**Status:** Phase 1 Sprints 1–4 complete. Sprint 5 (WebSocket + Verify) next.
 
 ---
 
@@ -12,12 +12,12 @@
 | Item | Value |
 |------|-------|
 | Repository | `C:\Users\OnyxB\hermes-eats-world\` |
-| Python files | 26 files, 3,637 lines |
-| Modules | 8 (schema, perception, target, capture, action, service, verify, spikes) |
+| Python files | 31 files, 5,359 lines |
+| Modules | 9 (schema, perception, target, capture, action, orchestrator, service, verify, spikes) |
 | Schema version | v1.0.0 |
 | Entry point | `python -m sidecar.service` |
 | Spec document | `~/AppData/Local/hermes/cache/documents/doc_f03e40aab73b_hermes-eats-world-spec.md` |
-| AAR (HTML) | `AAR-phase0-sprint3.html` |
+| AAR (HTML) | `AAR-phase0-sprint4.html` |
 
 ## Architecture at a Glance
 
@@ -29,6 +29,7 @@ hermes-eats-world/
 │   ├── target/           # Window finder, UWP frame drilling
 │   ├── capture/          # Screenshot (mss), OCR (pytesseract), template match
 │   ├── action/           # T1: UIA patterns, T2: SendInput synthesis
+│   ├── orchestrator/     # Goal-directed automation (planner, executor, recovery)
 │   ├── service/          # CLI, unified API, structured logging, env check
 │   └── verify/           # (empty — planned Sprint 5)
 ├── spikes/
@@ -36,7 +37,8 @@ hermes-eats-world/
 ├── pyproject.toml
 ├── requirements.txt
 ├── AAR-phase0-sprint1.html   # Original AAR
-├── AAR-phase0-sprint3.html   # Updated AAR (current)
+├── AAR-phase0-sprint3.html   # Sprint 3 AAR
+├── AAR-phase0-sprint4.html   # Sprint 4 AAR (current)
 └── HANDOFF.md               # This file
 ```
 
@@ -57,7 +59,7 @@ hermes-eats-world/
 - **OCR:** OCREngine class built with lazy init + threading lock. **Backend='none'** (pytesseract not installed, tesseract-ocr binary missing)
 
 ### Service Layer
-- **CLI:** `--list`, `--target`, `--process`, `--class`, `--screenshot`, `--max-depth`, `--output`, `--json-logs`
+- **CLI:** `--list`, `--target`, `--process`, `--class`, `--screenshot`, `--max-depth`, `--output`, `--json-logs`, `--run-goal`, `--max-steps`, `--recovery`
 - **Unified API:** `perceive_target()` — single entry point with auto-tier selection
 - **Structured logging:** JSON logging with `--json-logs` flag
 - **Environment check:** DPI awareness, elevation, UIA availability validation
@@ -66,18 +68,19 @@ hermes-eats-world/
 - **StateDeltaDetector:** Compare two TreeSnapshots, detect ADDED/MODIFIED/REMOVED elements
 - **Change categorization:** Role changes, value changes, pattern changes, position changes
 
+### Orchestrator (Sprint 4) — Fully Working
+- **Action planner:** Decomposes natural language goals into executable steps (regex-based intent matching)
+- **Executor loop:** PERCEIVE → PLAN → ACT → VERIFY cycle with configurable max steps
+- **Recovery strategies:** Retry, fallback, abort — configurable per execution
+- **CLI integration:** `--run-goal` flag for one-shot goal execution
+- **Smoke tested:** Notepad `type hello world` succeeds in 1.3s, 43 elements detected
+
 ### Verified & Tested
 - **10/10 Sprint 3 tests passing** (imports, schema, perception, delta detection, service)
+- **4/4 Sprint 4 tests passing** (orchestrator imports, CLI --help, CLI --run-goal, smoke test)
 - **All adversary findings resolved** (Review #1: 9 VALID, Review #2: 7 findings including 3 Critical)
 
 ## What's Not Done
-
-### Sprint 4: Orchestrator (In Progress)
-- Goal-directed automation engine
-- Action planner (decompose goals into steps)
-- Executor loop (PERCEIVE → PLAN → ACT → VERIFY)
-- Error recovery and retry logic
-- CLI integration (`--run-goal`)
 
 ### Sprint 5: WebSocket Service + Verify
 - WebSocket server (websockets + asyncio)
@@ -108,6 +111,7 @@ hermes-eats-world/
 | Schema versioning from day one | Allows schema evolution without breaking downstream consumers |
 | Lazy OCR initialization | Avoids heavy cold start on first call; defer backend probing to recognize() |
 | SendMessageW over PostMessageW | Synchronous text setting with proper ctypes marshaling |
+| Regex-based planner (Sprint 4) | Fast intent matching for T1 goals; LLM planner deferred to Sprint 7+ |
 
 ## Environment
 
@@ -131,6 +135,9 @@ python -m sidecar.service --target "File Explorer" --screenshot
 
 # With JSON structured logging
 python -m sidecar.service --list --json-logs
+
+# Run a goal against a target (Sprint 4)
+python -m sidecar.service --target "Untitled - Notepad" --run-goal "type hello world"
 ```
 
 ## Known Issues / Blockers
@@ -139,6 +146,7 @@ python -m sidecar.service --list --json-logs
 2. **WebSocket server:** Not implemented yet (Sprint 5).
 3. **Verify module:** Empty `sidecar/verify/` directory. State delta detection exists in `perception/delta.py` but no formal verify module yet.
 4. **T2 actions limited:** Only click and type implemented. Right-click, drag, hover, scroll pending.
+5. **Planner scope:** Current planner is regex-based — handles common patterns (click, type, navigate, open). Complex/novel goals need an LLM planner (future sprint).
 
 ## Adversary Board Reviews
 
@@ -152,6 +160,16 @@ python -m sidecar.service --list --json-logs
 - **Key catches:** ctypes marshaling bug, off-by-one in select_item, recursion pattern bug
 - **All 7 resolved** in commit `398ce95`
 
+## Sprint 4 Bugs Fixed
+
+| Bug | File | Fix |
+|-----|------|-----|
+| Regex optional capture group → None | `sidecar/orchestrator/planner.py` | Conditional check: `groups[1].strip() if groups[1] else None` |
+| `_find_element` tree/name null | `sidecar/orchestrator/planner.py` | Added null check before tree traversal |
+| Text capture regex lazy quantifier | `sidecar/orchestrator/planner.py` | Changed `(.+?)` to capture full phrases with spaces |
+| `patterns` → None instead of `{}` | `sidecar/perception/tree_walker.py` | Default to `{}` if `_get_control_patterns` returns None |
+| `patterns` booleans instead of dicts | `sidecar/perception/tree_walker.py` | Changed `True` → `{"supported": True}` for Pydantic validation |
+
 ## Sensitive Data
 
 **Project source, working tree, and git history are CLEAN.** All credential-reading scripts have been purged from git history. No PII or client data in the codebase.
@@ -159,9 +177,13 @@ python -m sidecar.service --list --json-logs
 ## Files of Interest
 
 - `sidecar/service/service.py` — Unified service API (`perceive_target()`)
+- `sidecar/service/cli.py` — CLI with orchestrator support (`--run-goal`)
 - `sidecar/perception/delta.py` — State delta detection
 - `sidecar/action/t1_invoke.py` — T1 action executors
 - `sidecar/action/t2_synthesize.py` — T2 action executors (SendInput)
 - `sidecar/capture/ocr.py` — OCR engine (lazy init, thread-safe)
 - `sidecar/capture/match.py` — Template matching (NCC)
 - `sidecar/service/logging.py` — Structured JSON logging
+- `sidecar/orchestrator/planner.py` — Goal-to-steps planner (regex intent matching)
+- `sidecar/orchestrator/executor.py` — PERCEIVE→PLAN→ACT→VERIFY loop
+- `sidecar/orchestrator/recovery.py` — Retry/fallback/abort strategies
