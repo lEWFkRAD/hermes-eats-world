@@ -257,6 +257,51 @@ def run_capture(args) -> int:
     return 0
 
 
+def run_move(args) -> int:
+    """Reposition the target window to absolute device pixels (desktop dock mode).
+
+    Used by the desktop to tile the selected app beside the docked Hermes panel.
+    """
+    import ctypes
+
+    try:
+        left, top, width, height = (int(x) for x in args.move.split(","))
+    except (ValueError, AttributeError):
+        print(make_error("bad_move", "--move expects 'left,top,width,height' integers"), file=sys.stderr)
+        return 2
+
+    target_result = find_window(
+        title=args.target, process_name=args.process, class_name=args.cls, timeout=5,
+    )
+    if target_result is None:
+        query = args.target or args.process or args.cls or "unknown"
+        print(make_error("window_not_found", f"Could not find window matching '{query}'", target=query),
+              file=sys.stderr)
+        return 1
+
+    hwnd = target_result.info.hwnd
+    if not hwnd:
+        print(make_error("no_hwnd", "Target window has no native handle"), file=sys.stderr)
+        return 1
+
+    user32 = ctypes.windll.user32
+    SW_RESTORE = 9
+    SWP_NOZORDER = 0x0004
+    SWP_NOACTIVATE = 0x0010
+    user32.ShowWindow(hwnd, SW_RESTORE)
+    ok = user32.SetWindowPos(hwnd, 0, left, top, width, height, SWP_NOZORDER | SWP_NOACTIVATE)
+    if not ok:
+        print(make_error("move_failed", "SetWindowPos failed"), file=sys.stderr)
+        return 1
+
+    print(json.dumps({
+        "moved": True,
+        "rect": {"left": left, "top": top, "width": width, "height": height},
+        "target": {"name": target_result.info.name, "pid": target_result.info.process_id},
+    }))
+    return 0
+
+
 def run_goal(args) -> int:
     """Execute the orchestrator: PERCEIVE → PLAN → ACT → VERIFY loop."""
     from ..orchestrator import Orchestrator, OrchestratorConfig
@@ -354,6 +399,9 @@ def main(argv=None):
                              "(for the desktop live-preview panel). Use with --target/--process.")
     parser.add_argument("--capture-width", type=int, default=480,
                         help="Max width (px) for --capture output (default: 480)")
+    parser.add_argument("--move", type=str, default=None, metavar="L,T,W,H",
+                        help="Reposition the target window to absolute device pixels "
+                             "left,top,width,height (for desktop dock mode). Restores it first if minimized.")
     parser.add_argument("--output", type=str, help="Output file path (default: stdout)")
     parser.add_argument("--min-size", type=int, default=100, help="Minimum window size for --list (default: 100)")
 
@@ -406,6 +454,12 @@ def main(argv=None):
             parser.error("--capture requires --target, --process, or --class")
             return 2
         return run_capture(args)
+
+    if args.move:
+        if not any([args.target, args.process, args.cls]):
+            parser.error("--move requires --target, --process, or --class")
+            return 2
+        return run_move(args)
 
     if args.goal:
         # Orchestrator mode
