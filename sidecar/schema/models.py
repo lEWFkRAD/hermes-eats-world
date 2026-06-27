@@ -201,6 +201,7 @@ class WindowInfo(BaseModel):
     class_name: str = ""
     automation_id: str = ""
     process_id: int = 0
+    hwnd: Optional[int] = None
     bounding_box: Optional[BoundingBox] = None
     is_enabled: bool = True
 

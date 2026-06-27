@@ -111,6 +111,7 @@ def perceive_target(
     screenshot: bool = False,
     output_file: Optional[str] = None,
     timeout: float = 5.0,
+    hwnd: Optional[int] = None,
 ) -> PerceptionResult:
     """Perceive a target window and return structured UI state.
 
@@ -141,6 +142,7 @@ def perceive_target(
         process_name=process,
         class_name=class_name,
         timeout=timeout,
+        hwnd=hwnd,
     )
 
     if target_result is None:

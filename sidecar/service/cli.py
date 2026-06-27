@@ -87,6 +87,7 @@ def run_perceive(args) -> int:
         process_name=args.process,
         class_name=args.cls,
         timeout=5,
+        hwnd=args.hwnd,
     )
 
     if target_result is None:
@@ -187,6 +188,7 @@ def run_list(args) -> int:
                 "class_name": w.class_name or "",
                 "automation_id": w.automation_id or "",
                 "pid": w.process_id,
+                "hwnd": w.hwnd,
                 "bounding_box": (
                     {
                         "left": w.bounding_box.left,
@@ -233,6 +235,7 @@ def run_capture(args) -> int:
     """
     target_result = find_window(
         title=args.target, process_name=args.process, class_name=args.cls, timeout=5,
+        hwnd=args.hwnd,
     )
     if target_result is None:
         query = args.target or args.process or args.cls or "unknown"
@@ -272,6 +275,7 @@ def run_move(args) -> int:
 
     target_result = find_window(
         title=args.target, process_name=args.process, class_name=args.cls, timeout=5,
+        hwnd=args.hwnd,
     )
     if target_result is None:
         query = args.target or args.process or args.cls or "unknown"
@@ -330,6 +334,7 @@ def run_goal(args) -> int:
         target_title=args.target,
         target_process=args.process,
         target_class=args.cls,
+        target_hwnd=args.hwnd,
     )
 
     # Print results
@@ -390,6 +395,9 @@ def main(argv=None):
     parser.add_argument("--target", type=str, help="Window title (substring match)")
     parser.add_argument("--process", type=str, help="Process name (e.g. notepad.exe)")
     parser.add_argument("--class", dest="cls", type=str, help="Window class name")
+    parser.add_argument("--hwnd", type=int, default=None,
+                        help="Exact native window handle (precise, unambiguous target). "
+                             "Preferred over --target when known (avoids wrong-window matches).")
     parser.add_argument("--depth", type=int, default=None,
                         help="Tree walk depth (max: 500). Default: 3 for --target perceive, "
                              "5 for --run-goal (deep enough for nested UWP apps).")
@@ -450,27 +458,27 @@ def main(argv=None):
         return run_list(args)
 
     if args.capture:
-        if not any([args.target, args.process, args.cls]):
+        if not any([args.target, args.process, args.cls, args.hwnd]):
             parser.error("--capture requires --target, --process, or --class")
             return 2
         return run_capture(args)
 
     if args.move:
-        if not any([args.target, args.process, args.cls]):
+        if not any([args.target, args.process, args.cls, args.hwnd]):
             parser.error("--move requires --target, --process, or --class")
             return 2
         return run_move(args)
 
     if args.goal:
         # Orchestrator mode
-        if not any([args.target, args.process, args.cls]):
+        if not any([args.target, args.process, args.cls, args.hwnd]):
             parser.error("--run-goal requires --target, --process, or --class")
             return 2
         return run_goal(args)
 
     # PERCEIVE requires a target
-    if not any([args.target, args.process, args.cls]):
-        parser.error("Specify --list, --target <title>, --process <name>, --class <class>, or --run-goal")
+    if not any([args.target, args.process, args.cls, args.hwnd]):
+        parser.error("Specify --list, --target <title>, --hwnd <handle>, --process <name>, --class <class>, or --run-goal")
         return 2
 
     return run_perceive(args)

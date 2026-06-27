@@ -65,18 +65,37 @@ def find_window(
     process_name: Optional[str] = None,
     class_name: Optional[str] = None,
     timeout: int = 5,
+    hwnd: Optional[int] = None,
 ) -> Optional[WindowTarget]:
-    """Find a window by title, process name, or class name.
-    
-    Priority: title > process_name > class_name (first match wins).
-    Uses SubName for substring matching on window titles.
-    
+    """Find a window by hwnd, title, process name, or class name.
+
+    Priority: hwnd (exact) > title > process_name > class_name (first match wins).
+    `hwnd` is the precise, unambiguous selector — title is a substring match that
+    can hit the wrong window when titles collide, so callers that already know the
+    handle (e.g. the desktop picker) should pass hwnd to avoid mis-targeting.
+
     Returns WindowTarget with both metadata AND the live control handle,
     so the caller can walk the tree immediately without re-attaching.
-    
+
     For backward compatibility, the returned object is also truthy/falsy
     like the old TargetInfo return.
     """
+    # Search by hwnd (exact, unambiguous) — preferred selector.
+    if hwnd:
+        for w in _enumerate_top_windows():
+            try:
+                if w.NativeWindowHandle == hwnd:
+                    return WindowTarget(
+                        info=_make_target_info(w),
+                        control=w,
+                        search_method="hwnd",
+                    )
+            except Exception as e:
+                logger.debug("hwnd search error: %s", e)
+        # An hwnd was explicitly requested but not found — do NOT silently fall
+        # back to a fuzzy title match on a different window.
+        return None
+
     # Search by title (substring)
     if title:
         win = uiautomation.WindowControl(searchDepth=1, SubName=title)
@@ -133,6 +152,7 @@ def list_windows(min_size: tuple = (100, 100)) -> List[WindowInfo]:
                 class_name=str(w.ClassName) if w.ClassName else "",
                 automation_id=str(w.AutomationId) if w.AutomationId else "",
                 process_id=w.ProcessId,
+                hwnd=w.NativeWindowHandle or None,
                 bounding_box=BoundingBox(
                     left=rect.left,
                     top=rect.top,

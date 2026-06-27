@@ -220,6 +220,7 @@ class Orchestrator:
         target_title: Optional[str] = None,
         target_process: Optional[str] = None,
         target_class: Optional[str] = None,
+        target_hwnd: Optional[int] = None,
     ) -> ExecutionResult:
         """Run the orchestrator loop for a given goal.
 
@@ -228,6 +229,7 @@ class Orchestrator:
             target_title: Window title to target.
             target_process: Process name to target.
             target_class: Window class name to target.
+            target_hwnd: Exact native window handle (precise, unambiguous).
 
         Returns:
             ExecutionResult with the outcome of the run.
@@ -239,6 +241,7 @@ class Orchestrator:
             "title": target_title,
             "process": target_process,
             "class_name": target_class,
+            "hwnd": target_hwnd,
         }
 
         logger.info("Orchestrator starting. Goal: %s", goal)
@@ -408,6 +411,7 @@ class Orchestrator:
             title=target_params.get("title"),
             process=target_params.get("process"),
             class_name=target_params.get("class_name"),
+            hwnd=target_params.get("hwnd"),
             depth=self.config.perception_depth,
         )
 
