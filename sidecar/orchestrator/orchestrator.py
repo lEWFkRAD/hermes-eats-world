@@ -58,7 +58,12 @@ class OrchestratorConfig:
     retry_count: int = 2
     retry_delay: float = 1.0
     require_verification: bool = True
-    perception_depth: int = 3
+    # Depth 3 is too shallow for nested UWP/XAML apps: e.g. the Windows
+    # Calculator keypad lives ~4-5 levels below the drilled content window, so at
+    # depth 3 the orchestrator perceives only frame chrome (~19 elements, no
+    # buttons) and every "click <button>" fails. Depth 5 reaches the actionable
+    # controls (keypad present, ~81 elements) and plateaus there.
+    perception_depth: int = 5
 
 
 @dataclass

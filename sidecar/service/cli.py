@@ -118,7 +118,7 @@ def run_perceive(args) -> int:
     patterns = get_control_patterns(win)
 
     # 3. Walk tree
-    max_depth = min(args.depth, 500)
+    max_depth = min(args.depth if args.depth is not None else 3, 500)
     root_elem, truncated = element_to_dict(win, depth=0, max_depth=max_depth, from_patterns=patterns)
 
     if truncated:
@@ -228,15 +228,19 @@ def run_goal(args) -> int:
     """Execute the orchestrator: PERCEIVE → PLAN → ACT → VERIFY loop."""
     from ..orchestrator import Orchestrator, OrchestratorConfig
 
-    config = OrchestratorConfig(
+    config_kwargs = dict(
         max_steps=args.max_steps,
         max_wait_seconds=args.timeout,
         step_timeout=args.step_timeout,
         retry_count=args.retries,
         retry_delay=args.retry_delay,
         require_verification=not args.no_verify,
-        perception_depth=args.depth,
     )
+    # Only override the orchestrator's perception depth when --depth is given;
+    # otherwise use its default (deeper, tuned for nested UWP apps).
+    if args.depth is not None:
+        config_kwargs["perception_depth"] = args.depth
+    config = OrchestratorConfig(**config_kwargs)
 
     orchestrator = Orchestrator(config=config)
 
@@ -308,7 +312,9 @@ def main(argv=None):
     parser.add_argument("--target", type=str, help="Window title (substring match)")
     parser.add_argument("--process", type=str, help="Process name (e.g. notepad.exe)")
     parser.add_argument("--class", dest="cls", type=str, help="Window class name")
-    parser.add_argument("--depth", type=int, default=3, help="Tree walk depth (default: 3, max: 500)")
+    parser.add_argument("--depth", type=int, default=None,
+                        help="Tree walk depth (max: 500). Default: 3 for --target perceive, "
+                             "5 for --run-goal (deep enough for nested UWP apps).")
     parser.add_argument("--screenshot", action="store_true", help="Capture window screenshot")
     parser.add_argument("--output", type=str, help="Output file path (default: stdout)")
     parser.add_argument("--min-size", type=int, default=100, help="Minimum window size for --list (default: 100)")

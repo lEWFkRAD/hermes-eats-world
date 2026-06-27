@@ -25,6 +25,24 @@ from ..schema import Element as ElementModel
 
 logger = logging.getLogger(__name__)
 
+# Digit ↔ word forms so a goal phrased with "7" still matches a button whose
+# accessible name is "Seven" (UWP Calculator, dial pads, etc.), and vice-versa.
+_DIGIT_TO_WORD = {
+    "0": "zero", "1": "one", "2": "two", "3": "three", "4": "four",
+    "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine",
+}
+_WORD_TO_DIGIT = {word: digit for digit, word in _DIGIT_TO_WORD.items()}
+
+
+def _search_terms(name_lower: str) -> list[str]:
+    """Expand a search string with digit↔word synonyms (exact-token only)."""
+    terms = [name_lower]
+    if name_lower in _DIGIT_TO_WORD:
+        terms.append(_DIGIT_TO_WORD[name_lower])
+    elif name_lower in _WORD_TO_DIGIT:
+        terms.append(_WORD_TO_DIGIT[name_lower])
+    return terms
+
 
 # ─── Action Step ───────────────────────────────────────────────────
 
@@ -409,22 +427,36 @@ class ActionPlanner:
     # ─── Element search helpers ────────────────────────────────────
 
     def _find_element(self, tree: Optional[ElementModel], name: str) -> Optional[ElementModel]:
-        """Find an element by name (case-insensitive substring match)."""
+        """Find an element by name (case-insensitive substring match).
+
+        Two refinements that matter for real apps (esp. UWP):
+        - digit↔word synonyms: a goal says "7" but the UWP Calculator button is
+          named "Seven" (and vice-versa), so we match either form.
+        - prefer an *invocable* match: "7" substring-matches both the static
+          TextControl label "7" and the ButtonControl "Seven"; the label can't
+          be clicked, so when several elements match we return the one carrying
+          an InvokePattern over a plain text node.
+        """
         if not tree:
             return None
 
-        name_lower = name.lower()
+        terms = _search_terms(name.lower())
+        matches: List[ElementModel] = []
 
-        def _search(elem: ElementModel) -> Optional[ElementModel]:
-            if elem.name and name_lower in elem.name.lower():
-                return elem
+        def _search(elem: ElementModel) -> None:
+            if elem.name:
+                lowered = elem.name.lower()
+                if any(term in lowered for term in terms):
+                    matches.append(elem)
             for child in elem.children:
-                result = _search(child)
-                if result:
-                    return result
+                _search(child)
+
+        _search(tree)
+        if not matches:
             return None
 
-        return _search(tree)
+        invocable = next((m for m in matches if "InvokePattern" in m.patterns), None)
+        return invocable or matches[0]
 
     def _find_element_by_keyword(self, tree: Optional[ElementModel], keyword: str) -> Optional[ElementModel]:
         """Find an element whose name contains the keyword."""
