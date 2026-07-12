@@ -30,12 +30,12 @@ PATTERN_MAP = {
 }
 
 
-def get_control_patterns(element) -> Dict[str, Dict[str, Any]]:
+def get_control_patterns(element, *, include_raw_values: bool = False) -> Dict[str, Dict[str, Any]]:
     """Extract all supported control patterns from a UIA element.
-    
+
     Attempts to GetPattern for each pattern type. Failed probes are
     silently skipped (logged at debug level).
-    
+
     Returns a dict mapping pattern names to their state dicts.
     """
     patterns: Dict[str, Dict[str, Any]] = {}
@@ -45,7 +45,9 @@ def get_control_patterns(element) -> Dict[str, Dict[str, Any]]:
         try:
             pattern_obj = element.GetPattern(pattern_id)
             if pattern_obj is not None:
-                patterns[name] = _probe_pattern(name, pattern_obj)
+                patterns[name] = _probe_pattern(
+                    name, pattern_obj, include_raw_values=include_raw_values
+                )
         except Exception as e:
             failures += 1
             logger.debug("Failed to probe pattern %s: %s", name, e)
@@ -56,13 +58,15 @@ def get_control_patterns(element) -> Dict[str, Dict[str, Any]]:
     return patterns
 
 
-def _probe_pattern(name: str, pattern_obj) -> Dict[str, Any]:
+def _probe_pattern(name: str, pattern_obj, *, include_raw_values: bool = False) -> Dict[str, Any]:
     """Probe a single pattern and return its state dict."""
     state: Dict[str, Any] = {"supported": True}
 
     if name == "value":
         try:
-            state["value"] = str(pattern_obj.Value)
+            value = str(pattern_obj.Value)
+            state["value"] = value if include_raw_values else "[REDACTED]"
+            state["value_length"] = len(value)
             state["readonly"] = pattern_obj.ReadOnly
         except Exception as e:
             logger.debug("Value pattern error: %s", e)

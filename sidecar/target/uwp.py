@@ -15,16 +15,16 @@ logger = logging.getLogger(__name__)
 
 # Class names that indicate a hosting frame
 FRAME_CLASSES = {
-    "ApplicationFrameWindow",       # UWP apps
-    "Windows.UI.Core.CoreWindow",   # WinUI/UWP core window
-    "DesktopWindowXamlSource",       # Win32+UWP hybrid
+    "ApplicationFrameWindow",  # UWP apps
+    "Windows.UI.Core.CoreWindow",  # WinUI/UWP core window
+    "DesktopWindowXamlSource",  # Win32+UWP hybrid
 }
 
 # Content window class hints
 CONTENT_CLASSES = {
-    "DesktopChildSiteBridge",       # WinUI 3 content
-    "Windows.UI.Core.CoreWindow",   # UWP content
-    "IME",                          # IME host
+    "DesktopChildSiteBridge",  # WinUI 3 content
+    "Windows.UI.Core.CoreWindow",  # UWP content
+    "IME",  # IME host
 }
 
 
@@ -35,7 +35,7 @@ def is_frame_window(class_name: str) -> bool:
 
 def drill_frame(frame_control) -> Optional[uiautomation.Control]:
     """Drill into an ApplicationFrameWindow to find the real content window.
-    
+
     Strategy:
     1. Get children of the frame
     2. Look for known content window classes

@@ -42,7 +42,7 @@ def find_window(
     timeout: int = 5,
 ) -> Optional[TargetInfo]:
     """Find a window by title, process name, or class name.
-    
+
     Priority: title > process_name > class_name (first match wins).
     Uses SubName for substring matching on window titles.
     """
@@ -82,22 +82,24 @@ def list_windows(min_size: tuple = (100, 100)) -> List[WindowInfo]:
             rect = w.BoundingRectangle
             w_width = rect.width()
             w_height = rect.height()
-            if w_width < min_w and w_height < min_h:
+            if w_width < min_w or w_height < min_h:
                 continue
 
-            windows.append(WindowInfo(
-                name=str(w.Name) if w.Name else "",
-                class_name=str(w.ClassName) if w.ClassName else "",
-                automation_id=str(w.AutomationId) if w.AutomationId else "",
-                process_id=w.ProcessId,
-                bounding_box=BoundingBox(
-                    left=rect.left,
-                    top=rect.top,
-                    width=w_width,
-                    height=w_height,
-                ),
-                is_enabled=w.IsEnabled,
-            ))
+            windows.append(
+                WindowInfo(
+                    name=str(w.Name) if w.Name else "",
+                    class_name=str(w.ClassName) if w.ClassName else "",
+                    automation_id=str(w.AutomationId) if w.AutomationId else "",
+                    process_id=w.ProcessId,
+                    bounding_box=BoundingBox(
+                        left=rect.left,
+                        top=rect.top,
+                        width=w_width,
+                        height=w_height,
+                    ),
+                    is_enabled=w.IsEnabled,
+                )
+            )
         except Exception as e:
             logger.debug("Error enumerating window: %s", e)
 

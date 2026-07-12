@@ -9,19 +9,19 @@ Schema versioning: Bump SCHEMA_VERSION on breaking changes.
 
 from __future__ import annotations
 
-import hashlib
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "0.1.0"
 
 
 # ─── Bounding Box ────────────────────────────────────────────────
 
+
 class BoundingBox(BaseModel):
     """Pixel coordinates of a UI element."""
+
     model_config = ConfigDict(frozen=True)
 
     left: int
@@ -39,6 +39,7 @@ class BoundingBox(BaseModel):
 
 
 # ─── Control Patterns ────────────────────────────────────────────
+
 
 class InvokePattern(BaseModel):
     supported: bool = True
@@ -112,8 +113,10 @@ class DockPattern(BaseModel):
 
 # ─── UI Element ──────────────────────────────────────────────────
 
+
 class Element(BaseModel):
     """A single UI element in the accessibility tree."""
+
     model_config = ConfigDict(populate_by_name=True)
 
     id: str = Field(description="Stable element ID for cross-snapshot correlation")
@@ -140,8 +143,10 @@ class Element(BaseModel):
 
 # ─── Tree Summary ────────────────────────────────────────────────
 
+
 class TreeSummary(BaseModel):
     """Aggregate statistics about the UIA tree."""
+
     total_elements: int = 0
     max_depth: int = 0
     control_types: Dict[str, int] = Field(
@@ -156,8 +161,10 @@ class TreeSummary(BaseModel):
 
 # ─── Tier Classification ────────────────────────────────────────
 
+
 class TierClassification(BaseModel):
     """Perception tier with confidence score and supporting evidence."""
+
     tier: str = Field(
         description="T1 = Rich tree, T1/T2 = Partial, T2 = Sparse/Vision primary",
     )
@@ -171,8 +178,10 @@ class TierClassification(BaseModel):
 
 # ─── Target Info ─────────────────────────────────────────────────
 
+
 class TargetInfo(BaseModel):
     """Information about the targeted window."""
+
     name: str
     class_name: str = ""
     process_id: int = 0
@@ -182,8 +191,10 @@ class TargetInfo(BaseModel):
 
 # ─── Tree Snapshot (root response) ──────────────────────────────
 
+
 class TreeSnapshot(BaseModel):
     """Complete structured snapshot of a window's UI state."""
+
     schema_version: str = SCHEMA_VERSION
     target: TargetInfo
     tier: TierClassification
@@ -195,8 +206,10 @@ class TreeSnapshot(BaseModel):
 
 # ─── Window List Item ────────────────────────────────────────────
 
+
 class WindowInfo(BaseModel):
     """A single window from the window list."""
+
     name: str
     class_name: str = ""
     automation_id: str = ""
@@ -207,8 +220,10 @@ class WindowInfo(BaseModel):
 
 # ─── Error Response ──────────────────────────────────────────────
 
+
 class ErrorResponse(BaseModel):
     """Structured error response for API consumers."""
+
     error: str = Field(description="Error code (machine-readable)")
     message: str = Field(description="Human-readable error description")
     target: Optional[str] = None
@@ -218,8 +233,10 @@ class ErrorResponse(BaseModel):
 
 # ─── Health Check ────────────────────────────────────────────────
 
+
 class HealthResponse(BaseModel):
     """Health check response."""
+
     status: str = "ok"  # ok, degraded, error
     version: str = SCHEMA_VERSION
     uptime_seconds: float = 0.0
