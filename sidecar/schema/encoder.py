@@ -9,12 +9,12 @@ import json
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from .models import TreeSnapshot, ErrorResponse, WindowInfo, HealthResponse
+from .models import ErrorResponse
 
 
 class HermesEncoder(json.JSONEncoder):
     """Custom JSON encoder that raises on unexpected types.
-    
+
     Unlike `default=str`, this explicitly handles known non-standard types
     and raises TypeError for anything unexpected — no silent data corruption.
     """
@@ -41,7 +41,7 @@ def serialize_model(model) -> str:
 
 def serialize_dict(data: Dict[str, Any]) -> str:
     """Serialize a plain dict with the strict encoder.
-    
+
     Raises TypeError on non-serializable types instead of silently
     converting them to garbage strings.
     """

@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "hermes-eats-world"
@@ -12,17 +12,26 @@ dependencies = [
     "mss==10.0.0",
     "Pillow>=10.0.0",
     "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "websockets>=12.0",
-    "tenacity>=8.0.0",
-    "python-json-logger>=2.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-    "pytest-mock>=3.0.0",
+    "ruff>=0.5.0",
 ]
 
 [project.scripts]
 heaw = "sidecar.service.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["sidecar*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]

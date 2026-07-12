@@ -8,6 +8,7 @@ Outputs PNG files with timestamped names in the project directory.
 import logging
 import os
 import time
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -27,12 +28,12 @@ def capture_window(
     output_dir: str = ".",
 ) -> Optional[str]:
     """Capture a screenshot of a window's bounding box.
-    
+
     Args:
         bounding_box: The window's UIA bounding rectangle.
         hwnd: Optional HWND for DPI coordinate conversion.
         output_dir: Directory to save the PNG file.
-    
+
     Returns:
         Path to the saved PNG, or None on failure.
     """
@@ -52,8 +53,8 @@ def capture_window(
         height = bounding_box.height
 
     monitor = {
-        "top": max(0, top),
-        "left": max(0, left),
+        "top": top,
+        "left": left,
         "width": width,
         "height": height,
     }
@@ -62,18 +63,18 @@ def capture_window(
     os.makedirs(output_dir, exist_ok=True)
 
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    output_path = Path(output_dir) / f"capture_{timestamp}.png"
+    output_path = Path(output_dir) / f"capture_{timestamp}_{uuid.uuid4().hex[:8]}.png"
 
     try:
         with mss.mss() as sct:
             sct_img = sct.grab(monitor)
-        
+
         # Convert BGRA → RGB
         img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
         img.save(str(output_path), "PNG")
         logger.info("Saved screenshot to %s", output_path)
         return str(output_path)
-    
+
     except Exception as e:
         logger.error("Screenshot capture failed: %s", e)
         return None
@@ -84,11 +85,11 @@ def capture_element(
     output_dir: str = ".",
 ) -> Optional[str]:
     """Capture a screenshot of a specific UIA element's bounding box.
-    
+
     Args:
         element: uiautomation element to capture.
         output_dir: Directory to save the PNG file.
-    
+
     Returns:
         Path to the saved PNG, or None on failure.
     """

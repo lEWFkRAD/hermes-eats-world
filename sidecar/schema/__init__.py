@@ -2,15 +2,15 @@
 
 from .encoder import HermesEncoder, make_error, make_success, serialize_dict, serialize_model
 from .models import (
+    SCHEMA_VERSION,
     BoundingBox,
     Element,
     ErrorResponse,
     HealthResponse,
-    SCHEMA_VERSION,
+    TargetInfo,
+    TierClassification,
     TreeSnapshot,
     TreeSummary,
-    TierClassification,
-    TargetInfo,
     WindowInfo,
 )
 

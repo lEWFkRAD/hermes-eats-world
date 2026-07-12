@@ -16,7 +16,6 @@ Usage:
 """
 
 import argparse
-import json
 import logging
 import sys
 import time
@@ -24,20 +23,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ..capture import capture_window
-from ..perception import classify_tier, element_to_dict, get_control_patterns, summarize_tree
 from ..schema import (
     SCHEMA_VERSION,
-    Element as ElementModel,
-    ErrorResponse,
-    make_error,
-    serialize_model,
+    Element,
+    TierClassification,
     TreeSnapshot,
     TreeSummary,
-    TierClassification,
-    WindowInfo,
+    make_error,
+    serialize_model,
 )
-from ..target import find_window, list_windows, is_frame_window, drill_frame
+from ..target import find_window, list_windows
 from .env_check import check_environment, set_dpi_awareness
+from .isolation import run_isolated
+from .worker import perceive_hwnd
 
 logger = logging.getLogger(__name__)
 
@@ -66,51 +64,69 @@ def run_perceive(args) -> int:
 
     if target is None:
         query = args.target or args.process or args.cls or "unknown"
-        err = make_error("window_not_found", f"Could not find window matching '{query}'", target=query)
+        err = make_error(
+            "window_not_found", f"Could not find window matching '{query}'", target=query
+        )
         print(err, file=sys.stderr)
         return 1
 
-    logger.info("Found window: %s (PID %d, class %s)", target.name, target.process_id, target.class_name)
-
-    # 2. Attach and walk tree
-    import uiautomation
-
-    win = uiautomation.WindowControl(
-        searchDepth=1,
-        SubName=target.name,
+    logger.info(
+        "Found window: %s (PID %d, class %s)", target.name, target.process_id, target.class_name
     )
-    if not win.Exists(0, 3):
-        err = make_error("window_attach_failed", f"Could not attach to window '{target.name}'", target=target.name)
-        print(err, file=sys.stderr)
+
+    return run_perceive_isolated(args, target, start)
+
+
+def run_perceive_isolated(args, target, start: float) -> int:
+    """Run the blocking perception phase in a disposable worker process."""
+    if not target.hwnd:
+        print(
+            make_error(
+                "window_attach_failed",
+                "Target has no usable window handle",
+                target=target.name,
+            ),
+            file=sys.stderr,
+        )
         return 1
 
-    # UWP frame drilling
-    if is_frame_window(target.class_name):
-        logger.info("Detected ApplicationFrameWindow — drilling for content")
-        content = drill_frame(win)
-        if content:
-            win = content
-            logger.info("Drilled to content window: %s", content.ClassName)
-        else:
-            logger.warning("Frame drilling failed — using frame window")
+    worker_result = run_isolated(
+        perceive_hwnd,
+        {
+            "hwnd": target.hwnd,
+            "class_name": target.class_name,
+            "max_depth": min(args.depth, 50),
+            "include_raw_values": args.include_raw_values,
+            "max_elements": args.max_elements,
+            "timeout": args.timeout,
+        },
+        timeout=args.timeout + 1,
+    )
+    if worker_result.status != "success":
+        code = {
+            "timeout": "tree_worker_timeout",
+            "crash": "tree_worker_crashed",
+            "error": "tree_worker_failed",
+        }.get(worker_result.status, "tree_worker_failed")
+        print(
+            make_error(
+                code,
+                worker_result.error or "Perception worker failed",
+                target=target.name,
+                retryable=worker_result.status in {"timeout", "crash"},
+                details={"exit_code": worker_result.exit_code},
+            ),
+            file=sys.stderr,
+        )
+        return 1
 
-    # Get patterns at root level
-    patterns = get_control_patterns(win)
+    payload = worker_result.value
+    root_elem = Element.model_validate(payload["tree"])
+    summary = TreeSummary.model_validate(payload["summary"])
+    tier = TierClassification.model_validate(payload["tier"])
+    if payload["truncated"]:
+        logger.warning("Tree was truncated at depth %d", args.depth)
 
-    # Walk tree
-    max_depth = min(args.depth, 500)
-    root_elem, truncated = element_to_dict(win, depth=0, max_depth=max_depth, from_patterns=patterns)
-
-    if truncated:
-        logger.warning("Tree was truncated at depth %d", max_depth)
-
-    # 3. Summarize and classify
-    summary = summarize_tree(win)
-    tier = classify_tier(summary)
-
-    elapsed = time.time() - start
-
-    # 4. Screenshot
     screenshot_path = None
     if args.screenshot and target.bounding_box:
         screenshot_path = capture_window(
@@ -119,7 +135,6 @@ def run_perceive(args) -> int:
             output_dir=str(Path(__file__).parents[2]),
         )
 
-    # 5. Build snapshot
     snapshot = TreeSnapshot(
         schema_version=SCHEMA_VERSION,
         target=target,
@@ -129,27 +144,21 @@ def run_perceive(args) -> int:
         screenshot_path=screenshot_path,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
-
-    # 6. Output
     output_json = serialize_model(snapshot)
-
     if args.output:
         output_path = Path(args.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(output_json)
+        output_path.write_text(output_json, encoding="utf-8")
         logger.info("Saved snapshot to %s", output_path)
     else:
-        # Truncate stdout output for readability
-        if len(output_json) > 80000:
-            print(output_json[:80000])
-            print("... [output truncated, use --output for full JSON]")
-        else:
-            print(output_json)
+        print(output_json)
 
     logger.info(
         "PERCEIVE complete: %d elements, tier=%s (confidence=%.2f), %.1fs",
-        summary.total_elements, tier.tier, tier.confidence, elapsed,
+        summary.total_elements,
+        tier.tier,
+        tier.confidence,
+        time.time() - start,
     )
     return 0
 
@@ -187,18 +196,49 @@ def main(argv=None):
     parser.add_argument("--target", type=str, help="Window title (substring match)")
     parser.add_argument("--process", type=str, help="Process name (e.g. notepad.exe)")
     parser.add_argument("--class", dest="cls", type=str, help="Window class name")
-    parser.add_argument("--depth", type=int, default=3, help="Tree walk depth (default: 3, max: 500)")
+    parser.add_argument(
+        "--depth",
+        type=int,
+        choices=range(0, 51),
+        default=3,
+        metavar="0..50",
+        help="Tree walk depth (default: 3, max: 50)",
+    )
+    parser.add_argument(
+        "--max-elements",
+        type=int,
+        default=5000,
+        help="Maximum elements per snapshot (default: 5000)",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=30.0,
+        help="Total tree-walk deadline in seconds (default: 30)",
+    )
+    parser.add_argument(
+        "--include-raw-values",
+        action="store_true",
+        help="Include sensitive UI values instead of redacting them",
+    )
     parser.add_argument("--screenshot", action="store_true", help="Capture window screenshot")
     parser.add_argument("--output", type=str, help="Output file path (default: stdout)")
-    parser.add_argument("--min-size", type=int, default=100, help="Minimum window size for --list (default: 100)")
+    parser.add_argument(
+        "--min-size", type=int, default=100, help="Minimum window size for --list (default: 100)"
+    )
 
     args = parser.parse_args(argv)
     setup_logging(args.verbose)
 
+    if args.max_elements < 1:
+        parser.error("--max-elements must be at least 1")
+    if args.timeout <= 0:
+        parser.error("--timeout must be greater than 0")
+
     # Environment check
     set_dpi_awareness()
     env = check_environment()
-    print(env.report())
+    print(env.report(), file=sys.stderr)
 
     if not env.is_ok:
         logger.error("Environment check failed. Cannot proceed.")

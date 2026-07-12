@@ -11,11 +11,12 @@ instead of obscure COM failures. Covers:
 """
 
 import ctypes
+import importlib.util
 import logging
 import platform
 import sys
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EnvCheckResult:
     """Result of environment validation."""
+
     passed: bool = True
     warnings: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
@@ -51,12 +53,12 @@ class EnvCheckResult:
         if self.warnings:
             lines.append("\n  WARNINGS:")
             for w in self.warnings:
-                lines.append(f"    ⚠ {w}")
+                lines.append(f"    WARNING: {w}")
         if self.errors:
             lines.append("\n  ERRORS:")
             for e in self.errors:
-                lines.append(f"    ✖ {e}")
-        lines.append(f"\n  Result: {'✅ PASS' if self.is_ok else '❌ FAIL'}")
+                lines.append(f"    ERROR: {e}")
+        lines.append(f"\n  Result: {'PASS' if self.is_ok else 'FAIL'}")
         lines.append("")
         return "\n".join(lines)
 
@@ -77,10 +79,9 @@ def check_environment() -> EnvCheckResult:
         return result  # No point continuing
 
     # 2. Check UIA availability
-    try:
-        import uiautomation
+    if importlib.util.find_spec("uiautomation") is not None:
         result.add_info("uiautomation", "available")
-    except ImportError:
+    else:
         result.add_error("uiautomation module not installed. Run: pip install uiautomation")
         return result
 
@@ -129,7 +130,7 @@ def check_environment() -> EnvCheckResult:
 
 def set_dpi_awareness():
     """Set process to per-monitor v2 DPI awareness.
-    
+
     Must be called early in the process, before any windows are created.
     Returns True if successful, False otherwise.
     """
@@ -159,7 +160,9 @@ def set_dpi_awareness():
     except Exception as e:
         logger.debug(f"SetProcessDpiAwareness failed: {e}")
 
-    logger.warning("Could not set DPI awareness — screenshots may be misaligned on high-DPI displays")
+    logger.warning(
+        "Could not set DPI awareness — screenshots may be misaligned on high-DPI displays"
+    )
     return False
 
 
@@ -184,15 +187,16 @@ def _get_monitor_dpi_info() -> str:
     """Get DPI info for all monitors."""
     try:
         import uiautomation
+
         desktop = uiautomation.WindowControl(searchDepth=1, Name="Program Manager")
         if not desktop.Exists(0, 0):
             return "unable to enumerate"
-        
+
         # Get primary monitor DPI
         hdc = ctypes.windll.user32.GetDC(0)
         dpi_x = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)  # LOGPIXELSX
         ctypes.windll.user32.ReleaseDC(0, hdc)
-        
+
         scale = dpi_x / 96.0
         return f"{dpi_x} DPI ({scale:.1%} scale)"
     except Exception as e:
@@ -209,7 +213,7 @@ def get_window_dpi(hwnd: int) -> int:
 
 def logical_to_device(hwnd: int, left: int, top: int, width: int, height: int):
     """Convert UIA logical coordinates to device (pixel) coordinates.
-    
+
     Uses GetDpiForWindow to get the target window's DPI scale factor.
     """
     dpi = get_window_dpi(hwnd)

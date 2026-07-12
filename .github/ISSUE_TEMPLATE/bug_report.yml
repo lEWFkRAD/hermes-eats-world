@@ -1,0 +1,71 @@
+name: Bug report
+description: Report a reproducible problem using sanitized data
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include screenshots, UI snapshots, window titles, credentials,
+        client data, or other sensitive content. Report security issues privately.
+  - type: checkboxes
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and pull requests.
+          required: true
+        - label: This is not a security vulnerability or sensitive-data exposure.
+          required: true
+  - type: input
+    attributes:
+      label: Version or commit
+      placeholder: 0.1.0 or commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Area
+      options:
+        - Plugin installation or packaging
+        - Window discovery or targeting
+        - UIA perception or classification
+        - Screenshot capture or DPI
+        - Worker isolation or timeout
+        - Action policy or verification
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Sanitized environment
+      description: Windows, Python, display scaling, elevation, and app type without private identifiers.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest safe reproduction using a disposable test application.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Sanitized logs
+      render: text
+      description: Remove all UI content, paths, usernames, tokens, HWNDs, and client information.
+  - type: checkboxes
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I verified that this report contains no secrets or sensitive UI data.
+          required: true

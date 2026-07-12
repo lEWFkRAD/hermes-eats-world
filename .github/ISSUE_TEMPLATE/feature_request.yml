@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a scoped capability or safety improvement
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: checkboxes
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and pull requests.
+          required: true
+  - type: textarea
+    attributes:
+      label: Problem
+      description: Describe the user or operator problem before proposing implementation.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed outcome
+      description: Describe the observable behavior and who benefits.
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Security impact
+      options:
+        - Reduces privilege or data exposure
+        - No expected security-boundary change
+        - Expands perception access
+        - Expands action or mutation capability
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Safety and verification plan
+      description: Explain allowlisting, confirmation, stale-state handling, receipts, and tests where relevant.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Alternatives considered
