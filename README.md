@@ -2,6 +2,10 @@
 
 Windows UI Automation perception sidecar for Hermes Agent. It discovers desktop windows, walks their UIA accessibility trees, classifies how automatable they are, and emits a versioned JSON snapshot that downstream planners can consume.
 
+This repository is packaged as an independently installable Hermes standalone
+plugin. Read [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), and
+[AGENTS.md](AGENTS.md) before deploying or changing the action boundary.
+
 > **Status:** early prototype. Perception works; action and verification packages are placeholders. Use it only in a disposable desktop session until safety boundaries are implemented.
 
 ## Requirements
@@ -11,6 +15,14 @@ Windows UI Automation perception sidecar for Hermes Agent. It discovers desktop 
 - An interactive desktop session
 
 ## Quick start
+
+Install through Hermes:
+
+```powershell
+hermes plugins install lEWFkRAD/hermes-eats-world --enable
+```
+
+For source development:
 
 ```powershell
 python -m venv .venv
@@ -67,4 +79,6 @@ Desktop automation can click, type, and expose sensitive UI content. Before acti
 
 ## License
 
-No license has been selected yet. All rights are reserved until the repository owner adds one.
+No license has been selected yet. All rights are reserved until the repository
+owner adds one. External contributions should not be accepted until that choice
+is recorded.
