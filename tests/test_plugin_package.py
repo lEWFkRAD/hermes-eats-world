@@ -20,5 +20,15 @@ def test_plugin_package_contains_operator_and_security_guidance():
         "CONTRIBUTING.md",
         "AGENTS.md",
         "after-install.md",
+        "LICENSE",
     ):
         assert (ROOT / filename).is_file(), filename
+
+
+def test_repository_has_structured_submission_templates():
+    template_dir = ROOT / ".github" / "ISSUE_TEMPLATE"
+
+    assert (template_dir / "bug_report.yml").is_file()
+    assert (template_dir / "feature_request.yml").is_file()
+    assert (template_dir / "config.yml").is_file()
+    assert (ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").is_file()

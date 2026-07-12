@@ -79,6 +79,4 @@ Desktop automation can click, type, and expose sensitive UI content. Before acti
 
 ## License
 
-No license has been selected yet. All rights are reserved until the repository
-owner adds one. External contributions should not be accepted until that choice
-is recorded.
+MIT. See [LICENSE](LICENSE).
