@@ -48,6 +48,7 @@ class ActionRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
     snapshot_schema_version: str
     expected_before: dict[str, Any] = Field(default_factory=dict)
+    expected_after: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_value_shape(self):

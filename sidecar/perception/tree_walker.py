@@ -30,11 +30,10 @@ def make_element_id(element, path: str = "0") -> str:
     Hash of stable-ish UIA identity fields plus the element's ancestry path.
     """
     try:
-        name = str(element.Name) if element.Name else ""
         ctrl_type = str(element.ControlTypeName)
         automation_id = str(element.AutomationId) if element.AutomationId else ""
         class_name = str(element.ClassName) if element.ClassName else ""
-        raw = f"{path}|{automation_id}|{class_name}|{ctrl_type}|{name}"
+        raw = f"{path}|{automation_id}|{class_name}|{ctrl_type}"
         return hashlib.md5(raw.encode("utf-8", errors="replace")).hexdigest()[:12]
     except Exception as e:
         logger.debug("Failed to make element ID: %s", e)

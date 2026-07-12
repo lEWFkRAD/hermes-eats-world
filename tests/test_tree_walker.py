@@ -78,6 +78,14 @@ def test_element_id_does_not_change_when_bounds_change():
     assert make_element_id(control, "0.1") == original
 
 
+def test_element_id_does_not_change_when_visible_name_changes():
+    control = FakeControl()
+    original = make_element_id(control, "0.1")
+    control.Name = "Saved"
+
+    assert make_element_id(control, "0.1") == original
+
+
 def test_tree_walk_enforces_element_limit():
     root = FakeControl([FakeControl(), FakeControl()])
 
