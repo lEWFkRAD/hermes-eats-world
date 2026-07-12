@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from .models import ActionKind, ActionReceipt, ActionRequest, ActionStatus, RiskLevel
 
-POLICY_VERSION = "0.1.0"
+POLICY_VERSION = "1.0.0"
 
 
 @dataclass(frozen=True)

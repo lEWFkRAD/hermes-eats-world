@@ -42,7 +42,7 @@ def request(**overrides):
         "risk": RiskLevel.LOW,
         "dry_run": False,
         "reason": "Save reviewed work",
-        "snapshot_schema_version": "0.1.0",
+        "snapshot_schema_version": "1.0.0",
         "expected_before": {"name": "Save", "is_enabled": True},
         "expected_after": {"name": "Saved"},
     }

@@ -1,6 +1,6 @@
 manifest_version: 1
 name: hermes-eats-world
-version: 0.1.0
+version: 1.0.0
 description: >
   Install and operate the Windows UI Automation perception and verified-action
   sidecar for Hermes Agent.

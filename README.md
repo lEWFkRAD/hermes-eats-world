@@ -6,7 +6,9 @@ This repository is packaged as an independently installable Hermes standalone
 plugin. Read [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), and
 [AGENTS.md](AGENTS.md) before deploying or changing the action boundary.
 
-> **Status:** early prototype. Perception works; action and verification packages are placeholders. Use it only in a disposable desktop session until safety boundaries are implemented.
+> **Status:** v1 release candidate. Bounded perception and the standalone plugin
+> are supported. Action policy, stale-state checks, and verification receipts are
+> stable contracts, but live action execution is not exposed through the CLI.
 
 ## Requirements
 
@@ -65,13 +67,15 @@ The test suite keeps pure model and traversal behavior independent of a live Win
 
 ## Roadmap
 
-1. Stabilize and test perception contracts.
-2. Add explicit action allowlists and dry-run support.
-3. Implement post-action verification and audit receipts.
-4. Add a Hermes transport boundary and end-to-end fixtures.
-5. Package signed Windows releases.
+1. Add a Hermes command surface for perception and dry-run action planning.
+2. Add an explicitly enabled UIA invoke adapter behind the existing policy gate.
+3. Expand calibrated fixtures across common Windows applications.
+4. Package signed Windows executables in addition to the Python wheel.
 
 See `spikes/001-perception-spike/SYNTHESIS.md` for the initial research record.
+
+See [CHANGELOG.md](CHANGELOG.md) for released behavior and
+[docs/RELEASING.md](docs/RELEASING.md) for the maintainer release process.
 
 ## Safety
 

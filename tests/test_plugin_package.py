@@ -8,7 +8,7 @@ def test_standalone_plugin_manifest_has_required_identity():
 
     assert "manifest_version: 1" in manifest
     assert "name: hermes-eats-world" in manifest
-    assert "version: 0.1.0" in manifest
+    assert "version: 1.0.0" in manifest
     assert "kind: standalone" in manifest
     assert "  - windows" in manifest
 

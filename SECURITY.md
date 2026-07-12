@@ -60,5 +60,5 @@ accepts arbitrary coordinates, scripts, key sequences, or unverified model outpu
 
 ## Supported versions
 
-Security fixes are applied to the latest revision on the default branch. No
-stable production release is currently supported; version `0.1.x` is a prototype.
+Security fixes are applied to the latest `1.x` release and the default branch.
+Pre-1.0 revisions are unsupported.

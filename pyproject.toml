@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hermes-eats-world"
-version = "0.1.0"
+version = "1.0.0"
 description = "Hermes Eats World - Windows UI perception and action sidecar"
 requires-python = ">=3.10"
 dependencies = [
