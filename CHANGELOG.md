@@ -3,6 +3,18 @@
 All notable changes are documented here. This project follows Semantic
 Versioning and uses GitHub Releases for distributable artifacts.
 
+## [Unreleased]
+
+### Added
+
+- Exact `--window-id` / `--hwnd` targeting for a safe handoff from Hermes
+  Desktop HUD mode's `read_window_below.window.id` on Windows.
+
+### Security
+
+- Exact-handle targeting fails closed when the supplied HWND is invalid or
+  inaccessible instead of falling back to an ambiguous title or process match.
+
 ## [1.0.0] - 2026-07-12
 
 ### Added
