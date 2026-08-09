@@ -4,6 +4,7 @@ Hermes Eats World — CLI Entry Point
 ====================================
 Command-line interface for the sidecar. Supports:
 - Window discovery (--list)
+- Exact HUD handoff targeting (--window-id/--hwnd)
 - Window targeting (--target, --process, --class)
 - Tree walking with configurable depth
 - Screenshot capture
@@ -11,6 +12,7 @@ Command-line interface for the sidecar. Supports:
 
 Usage:
     python -m sidecar.service.cli --list
+    python -m sidecar.service.cli --window-id 123456 --depth 3
     python -m sidecar.service.cli --target "File Explorer" --depth 5
     python -m sidecar.service.cli --process notepad.exe --screenshot
 """
@@ -40,6 +42,21 @@ from .worker import perceive_hwnd
 logger = logging.getLogger(__name__)
 
 
+def parse_window_id(value: str) -> int:
+    """Parse a positive decimal or ``0x``-prefixed Windows HWND."""
+    try:
+        base = 16 if value.lower().startswith("0x") else 10
+        window_id = int(value, base)
+    except ValueError as exc:
+        message = "window id must be a decimal or 0x-prefixed integer"
+        raise argparse.ArgumentTypeError(message) from exc
+
+    if window_id <= 0:
+        raise argparse.ArgumentTypeError("window id must be greater than 0")
+
+    return window_id
+
+
 def setup_logging(verbose: bool = False):
     """Configure logging."""
     level = logging.DEBUG if verbose else logging.INFO
@@ -56,6 +73,7 @@ def run_perceive(args) -> int:
 
     # 1. Find window
     target = find_window(
+        hwnd=args.hwnd,
         title=args.target,
         process_name=args.process,
         class_name=args.cls,
@@ -63,7 +81,11 @@ def run_perceive(args) -> int:
     )
 
     if target is None:
-        query = args.target or args.process or args.cls or "unknown"
+        query = (
+            f"window id {args.hwnd}"
+            if args.hwnd is not None
+            else args.target or args.process or args.cls or "unknown"
+        )
         err = make_error(
             "window_not_found", f"Could not find window matching '{query}'", target=query
         )
@@ -193,9 +215,20 @@ def main(argv=None):
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
     parser.add_argument("--list", action="store_true", help="List all visible windows")
-    parser.add_argument("--target", type=str, help="Window title (substring match)")
-    parser.add_argument("--process", type=str, help="Process name (e.g. notepad.exe)")
-    parser.add_argument("--class", dest="cls", type=str, help="Window class name")
+    selector = parser.add_mutually_exclusive_group()
+    selector.add_argument(
+        "--window-id",
+        "--hwnd",
+        dest="hwnd",
+        type=parse_window_id,
+        help=(
+            "Exact Windows HWND; pass read_window_below.window.id when a request "
+            "comes from Hermes HUD mode"
+        ),
+    )
+    selector.add_argument("--target", type=str, help="Window title (substring match)")
+    selector.add_argument("--process", type=str, help="Process name (e.g. notepad.exe)")
+    selector.add_argument("--class", dest="cls", type=str, help="Window class name")
     parser.add_argument(
         "--depth",
         type=int,
@@ -249,8 +282,11 @@ def main(argv=None):
         return run_list(args)
 
     # PERCEIVE requires a target
-    if not any([args.target, args.process, args.cls]):
-        parser.error("Specify --list, --target <title>, --process <name>, or --class <class>")
+    if not any([args.hwnd is not None, args.target, args.process, args.cls]):
+        parser.error(
+            "Specify --list, --window-id <id>, --target <title>, "
+            "--process <name>, or --class <class>"
+        )
         return 2
 
     return run_perceive(args)

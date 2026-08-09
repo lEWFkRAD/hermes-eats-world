@@ -1,7 +1,7 @@
 """
 Hermes Eats World — Window Targeting
 =====================================
-Find and attach to windows by title (substring), process name, or class name.
+Find and attach to windows by exact HWND, title, process name, or class name.
 Includes PID→process-name lookup via ctypes (no psutil dependency).
 """
 
@@ -40,12 +40,34 @@ def find_window(
     process_name: Optional[str] = None,
     class_name: Optional[str] = None,
     timeout: int = 5,
+    hwnd: Optional[int] = None,
 ) -> Optional[TargetInfo]:
-    """Find a window by title, process name, or class name.
+    """Find a window by exact HWND, title, process name, or class name.
 
-    Priority: title > process_name > class_name (first match wins).
+    Priority: HWND > title > process_name > class_name (first match wins).
     Uses SubName for substring matching on window titles.
+
+    An HWND lookup is intentionally fail-closed: when the exact handle is invalid
+    or inaccessible, do not fall through to a weaker selector that could attach
+    to a different window. Hermes HUD mode's ``read_window_below`` tool returns
+    this handle as ``window.id`` on Windows.
     """
+    if hwnd is not None:
+        try:
+            win = uiautomation.ControlFromHandle(hwnd)
+            if win is not None and win.Exists(0, timeout):
+                target = _make_target_info(win)
+                if target.hwnd == hwnd:
+                    return target
+                logger.debug(
+                    "HWND lookup returned a different handle: requested=%d actual=%s",
+                    hwnd,
+                    target.hwnd,
+                )
+        except Exception as e:
+            logger.debug("HWND lookup failed for %d: %s", hwnd, e)
+        return None
+
     # Search by title (substring)
     if title:
         win = uiautomation.WindowControl(searchDepth=1, SubName=title)

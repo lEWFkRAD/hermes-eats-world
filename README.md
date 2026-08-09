@@ -34,6 +34,26 @@ heaw --list
 heaw --target "Notepad" --depth 3 --output artifacts\notepad.json
 ```
 
+### Hermes HUD mode
+
+Hermes Desktop HUD mode floats over the application the user is working in.
+Hermes's `read_window_below` tool returns metadata for that application; on
+Windows, its `window.id` is the exact native window handle. Pass that value to
+the sidecar instead of re-matching a possibly ambiguous title or process:
+
+```powershell
+heaw --window-id 123456 --depth 3
+# Hexadecimal HWNDs are accepted too:
+heaw --hwnd 0x1E240 --depth 3
+```
+
+Treat this as a fresh handoff. Call `read_window_below` again after the HUD is
+moved, the foreground application changes, or before planning an action. An
+invalid or inaccessible exact handle fails closed; the sidecar never falls back to a
+different title/process match. HUD handoff does not enable actions, capture a
+screenshot, or include raw UI values unless those capabilities are requested
+separately.
+
 UI text values are redacted by default. `--include-raw-values` is available for
 explicitly approved debugging sessions, but its output must be treated as sensitive.
 
@@ -67,10 +87,11 @@ The test suite keeps pure model and traversal behavior independent of a live Win
 
 ## Roadmap
 
-1. Add a Hermes command surface for perception and dry-run action planning.
-2. Add an explicitly enabled UIA invoke adapter behind the existing policy gate.
-3. Expand calibrated fixtures across common Windows applications.
-4. Package signed Windows executables in addition to the Python wheel.
+1. Register exact-handle HUD perception as a typed Hermes tool.
+2. Add a Hermes command surface for perception and dry-run action planning.
+3. Add an explicitly enabled UIA invoke adapter behind the existing policy gate.
+4. Expand calibrated fixtures across common Windows applications.
+5. Package signed Windows executables in addition to the Python wheel.
 
 See `spikes/001-perception-spike/SYNTHESIS.md` for the initial research record.
 
