@@ -6,7 +6,7 @@ This repository is packaged as an independently installable Hermes standalone
 plugin. Read [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), and
 [AGENTS.md](AGENTS.md) before deploying or changing the action boundary.
 
-> **Status:** v1 release candidate. Bounded perception and the standalone plugin
+> **Status:** v1.0.0. Bounded perception and the standalone plugin
 > are supported. Action policy, stale-state checks, and verification receipts are
 > stable contracts, but live action execution is not exposed through the CLI.
 
