@@ -6,7 +6,7 @@ Closes #
 
 ## Testing
 
-- [ ] `python -m ruff check sidecar tests`
+- [ ] `python -m ruff check sidecar scripts tests`
 - [ ] `python -m pytest -q`
 - [ ] `python -m build --wheel`
 - [ ] Live Windows UIA smoke test (only check if performed)
@@ -15,7 +15,7 @@ Closes #
 
 - [ ] I searched existing issues and pull requests
 - [ ] A tracking issue exists for substantial or security-boundary work
-- [ ] External commits are signed off under the DCO
+- [ ] Every commit is signed off under the DCO (`git commit -s`)
 - [ ] Required CI passes and all review conversations are resolved before merge
 
 ## Safety and compatibility

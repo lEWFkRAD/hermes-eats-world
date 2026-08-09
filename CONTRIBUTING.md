@@ -9,8 +9,9 @@ must preserve its deny-by-default action boundary and machine-readable protocol.
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
-python -m ruff check sidecar tests
+python -m ruff check sidecar scripts tests
 python -m pytest -q
+python -m build --wheel
 ```
 
 Run live UIA tests only in an interactive disposable session. Never commit real
@@ -35,6 +36,23 @@ directly to a PR.
    verification receipts, or worker isolation without an explicit security review.
 8. Wait for required CI and resolve every review conversation before merge.
 9. Do not force-push after review begins.
+
+## Submitting from a fork
+
+1. Fork the repository and branch from the latest `main`.
+2. Keep GitHub Actions workflows free of secrets; fork pull requests run with a
+   read-only token and cannot access repository secrets.
+3. Sign off every commit with `git commit -s` to certify the Developer
+   Certificate of Origin. The DCO check validates every commit, not only the
+   latest one.
+4. Open a pull request against `lEWFkRAD/hermes-eats-world:main` and complete the
+   safety checklist.
+5. Wait for `Required PR checks`. It aggregates lint/policy checks, tests on the
+   supported Windows Python matrix, wheel build/install, and DCO validation.
+6. Address Code Owner feedback and resolve every review conversation.
+
+See `docs/BRANCH_PROTECTION.md` for the enforced `main` policy and the stable
+required-check contract.
 
 Report vulnerabilities through the private process in `SECURITY.md`.
 

@@ -10,7 +10,7 @@ future verified desktop actions.
 Before handing off any change, run:
 
 ```powershell
-python -m ruff check sidecar tests
+python -m ruff check sidecar scripts tests
 python -m pytest -q
 python -m build --wheel
 git diff --check

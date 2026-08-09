@@ -1,0 +1,7 @@
+# Security-sensitive surfaces always request maintainer review.
+* @lEWFkRAD
+/.github/ @lEWFkRAD
+/sidecar/action/ @lEWFkRAD
+/sidecar/service/ @lEWFkRAD
+/SECURITY.md @lEWFkRAD
+
