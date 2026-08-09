@@ -4,16 +4,42 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
 
+# Fork pull requests run untrusted code. Keep the token read-only and never use
+# pull_request_target or repository secrets in this workflow.
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  lint:
+    name: Lint and policy checks
     runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m ruff check sidecar scripts tests
+      - run: python -m compileall -q sidecar scripts tests
+
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: windows-latest
+    timeout-minutes: 15
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.12", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -22,5 +48,76 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[dev]"
-      - run: python -m ruff check sidecar tests
       - run: python -m pytest -q
+
+  package:
+    name: Build and install wheel
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m build --wheel
+      - name: Install wheel in a clean environment
+        shell: pwsh
+        run: |
+          $wheel = Get-ChildItem dist\*.whl | Select-Object -First 1
+          if (-not $wheel) { throw "Wheel was not built" }
+          $smoke = Join-Path $env:RUNNER_TEMP "heaw-wheel-smoke"
+          python -m venv $smoke
+          & "$smoke\Scripts\python.exe" -m pip install --upgrade pip
+          & "$smoke\Scripts\python.exe" -m pip install $wheel.FullName
+          & "$smoke\Scripts\heaw.exe" --help
+
+  dco:
+    name: DCO sign-off
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify every pull-request commit is signed off
+        run: >-
+          python scripts/check_dco.py
+          "${{ github.event.pull_request.base.sha }}"
+          "${{ github.event.pull_request.head.sha }}"
+
+  required:
+    name: Required PR checks
+    if: always()
+    needs: [lint, test, package, dco]
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every CI lane
+        shell: pwsh
+        env:
+          LINT_RESULT: ${{ needs.lint.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
+          DCO_RESULT: ${{ needs.dco.result }}
+        run: |
+          $results = @{
+            lint = $env:LINT_RESULT
+            test = $env:TEST_RESULT
+            package = $env:PACKAGE_RESULT
+            dco = $env:DCO_RESULT
+          }
+          $failed = $results.GetEnumerator() | Where-Object {
+            $_.Value -notin @("success", "skipped")
+          }
+          if ($failed) {
+            $summary = ($failed | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ", "
+            throw "Required CI lanes failed: $summary"
+          }
+          $results.GetEnumerator() | Sort-Object Key | Format-Table -AutoSize
