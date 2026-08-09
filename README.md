@@ -18,11 +18,36 @@ plugin. Read [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), and
 
 ## Quick start
 
-Install through Hermes:
+Install the Python package once into Hermes's environment so the plugin entry
+point and Windows UIA dependencies are available:
 
 ```powershell
-hermes plugins install lEWFkRAD/hermes-eats-world --enable
+python -m pip install "git+https://github.com/lEWFkRAD/hermes-eats-world.git"
+hermes plugins enable hermes-eats-world
+hermes gateway restart
 ```
+
+The plugin registers the read-only `uia_perceive_window` tool. It accepts the
+fresh `read_window_below.window.id`, always redacts raw UI values, never captures
+a screenshot, and runs UIA traversal behind the killable worker boundary.
+
+### Multiple Hermes profiles
+
+Hermes profiles are isolated by `HERMES_HOME`. The package is installed once,
+but plugin enablement is intentionally per profile:
+
+```powershell
+hermes -p work plugins enable hermes-eats-world
+hermes -p personal plugins enable hermes-eats-world
+hermes -p work gateway restart
+hermes -p personal gateway restart
+```
+
+Each profile loads its own plugin registration and every tool response includes
+the active `hermes_profile`. The tool is stateless and does not write snapshots,
+screenshots, caches, or other files that could leak across profiles. Do not pass
+one profile's HUD window handle to another profile; each call must use a fresh
+`read_window_below.window.id` from the requesting profile's current turn.
 
 For source development:
 

@@ -9,6 +9,9 @@ Versioning and uses GitHub Releases for distributable artifacts.
 
 - Exact `--window-id` / `--hwnd` targeting for a safe handoff from Hermes
   Desktop HUD mode's `read_window_below.window.id` on Windows.
+- First-class Hermes plugin entry points for directory and pip installations.
+- A profile-aware, read-only `uia_perceive_window` tool that reports the active
+  Hermes profile while keeping perception stateless and raw UI values redacted.
 
 ### Security
 

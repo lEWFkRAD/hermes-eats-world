@@ -8,6 +8,7 @@ author: Jeffrey Watts
 kind: standalone
 platforms:
   - windows
-provides_tools: []
+provides_tools:
+  - uia_perceive_window
 requires_env: []
 optional_env: []

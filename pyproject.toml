@@ -24,6 +24,9 @@ dev = [
 [project.scripts]
 heaw = "sidecar.service.cli:main"
 
+[project.entry-points."hermes_agent.plugins"]
+hermes-eats-world = "sidecar.hermes_plugin:register"
+
 [tool.setuptools.packages.find]
 include = ["sidecar*"]
 
