@@ -1,20 +1,23 @@
 import json
 
+from sidecar import hermes_plugin
 from sidecar.hermes_plugin import TOOL_NAME, handle_uia_perceive_window, register
-from sidecar.schema import BoundingBox, TargetInfo
-from sidecar.service.isolation import IsolatedResult
 
 
 class FakeContext:
     def __init__(self, profile_name):
         self.profile_name = profile_name
         self.registration = None
+        self.cli_registration = None
 
     def register_tool(self, **kwargs):
         self.registration = kwargs
 
+    def register_cli_command(self, **kwargs):
+        self.cli_registration = kwargs
 
-def test_registers_a_profile_bound_read_only_tool():
+
+def test_registers_profile_bound_tool_and_setup_command():
     work = FakeContext("work")
     personal = FakeContext("personal")
 
@@ -26,82 +29,67 @@ def test_registers_a_profile_bound_read_only_tool():
     assert work.registration["schema"]["parameters"]["required"] == ["window_id"]
     assert work.registration["handler"].keywords["profile_name"] == "work"
     assert personal.registration["handler"].keywords["profile_name"] == "personal"
+    assert work.cli_registration["name"] == "heaw"
+    assert work.cli_registration["handler_fn"] is hermes_plugin.handle_cli
 
 
-def test_tool_response_is_profile_scoped_and_redacted(monkeypatch):
-    target = TargetInfo(
-        name="Editor",
-        class_name="EditorWindow",
-        process_id=42,
-        bounding_box=BoundingBox(left=0, top=0, width=800, height=600),
-        hwnd=123456,
-    )
+def test_tool_response_is_profile_scoped_and_privacy_is_explicit(monkeypatch):
     seen = {}
+    monkeypatch.setattr(hermes_plugin, "runtime_available", lambda: True)
 
-    monkeypatch.setattr("sidecar.hermes_plugin.check_uia_available", lambda: True)
-    monkeypatch.setattr("sidecar.service.env_check.set_dpi_awareness", lambda: None)
-    monkeypatch.setattr("sidecar.target.find_window", lambda **_kwargs: target)
-
-    def fake_run_isolated(_function, request, *, timeout):
+    def fake_worker(request, *, timeout):
         seen["request"] = request
         seen["timeout"] = timeout
-        return IsolatedResult(
-            status="success",
-            value={
-                "tree": {
-                    "id": "root",
-                    "control_type": "WindowControl",
-                    "localized_type": "window",
-                    "name": "Editor",
-                    "children": [],
-                },
-                "summary": {"total_elements": 1, "max_depth": 0},
-                "tier": {
-                    "tier": "T1",
-                    "label": "Rich UIA tree",
-                    "confidence": 1.0,
-                },
-                "truncated": False,
+        return {
+            "sensitive_artifact": True,
+            "redaction": {
+                "value_patterns": True,
+                "password_controls": True,
+                "element_names": False,
+                "automation_ids": False,
             },
-        )
+            "snapshot": {"target": {"hwnd": 123456}},
+        }
 
-    monkeypatch.setattr("sidecar.service.isolation.run_isolated", fake_run_isolated)
+    monkeypatch.setattr(hermes_plugin, "run_runtime_worker", fake_worker)
 
     result = json.loads(
         handle_uia_perceive_window(
-            {"window_id": 123456, "depth": 4, "max_elements": 250, "timeout": 8},
+            {
+                "window_id": 123456,
+                "depth": 4,
+                "max_elements": 250,
+                "max_output_bytes": 65536,
+                "timeout": 8,
+            },
             profile_name="work",
         )
     )
 
     assert result["hermes_profile"] == "work"
-    assert result["redacted"] is True
-    assert result["snapshot"]["target"]["hwnd"] == 123456
-    assert result["snapshot"]["screenshot_path"] is None
-    assert seen["request"]["include_raw_values"] is False
-    assert seen["request"]["max_depth"] == 4
+    assert result["sensitive_artifact"] is True
+    assert result["redaction"]["value_patterns"] is True
+    assert result["redaction"]["element_names"] is False
+    assert "redacted" not in result
+    assert seen["request"]["depth"] == 4
     assert seen["request"]["max_elements"] == 250
-    assert seen["timeout"] == 9
+    assert seen["request"]["max_output_bytes"] == 65536
+    assert seen["timeout"] == 10
 
 
-def test_tool_fails_closed_when_exact_window_is_missing(monkeypatch):
-    monkeypatch.setattr("sidecar.hermes_plugin.check_uia_available", lambda: True)
-    monkeypatch.setattr("sidecar.service.env_check.set_dpi_awareness", lambda: None)
-    monkeypatch.setattr("sidecar.target.find_window", lambda **_kwargs: None)
+def test_tool_requires_profile_runtime(monkeypatch):
+    monkeypatch.setattr(hermes_plugin, "runtime_available", lambda: False)
 
     result = json.loads(
         handle_uia_perceive_window({"window_id": 77}, profile_name="personal")
     )
 
-    assert result == {
-        "hermes_profile": "personal",
-        "error": "window_not_found",
-        "message": "Could not attach to exact window id 77.",
-        "retryable": True,
-    }
+    assert result["error"] == "runtime_unavailable"
+    assert "hermes profile use personal" in result["message"]
+    assert "hermes heaw setup" in result["message"]
 
 
-def test_tool_rejects_invalid_bounds_without_touching_uia():
+def test_tool_rejects_invalid_bounds_before_runtime_check():
     result = json.loads(
         handle_uia_perceive_window(
             {"window_id": 12, "depth": 11},
@@ -111,3 +99,21 @@ def test_tool_rejects_invalid_bounds_without_touching_uia():
 
     assert result["hermes_profile"] == "work"
     assert result["error"] == "invalid_arguments"
+
+
+def test_tool_rejects_parallel_scan(monkeypatch):
+    class BusySlot:
+        def acquire(self, *, blocking):
+            assert blocking is False
+            return False
+
+        def release(self):  # pragma: no cover - must not be called
+            raise AssertionError("busy slot cannot be released")
+
+    monkeypatch.setattr(hermes_plugin, "runtime_available", lambda: True)
+    monkeypatch.setattr(hermes_plugin, "_SCAN_SLOT", BusySlot())
+
+    result = json.loads(handle_uia_perceive_window({"window_id": 12}, profile_name="work"))
+
+    assert result["error"] == "scan_in_progress"
+    assert result["retryable"] is True

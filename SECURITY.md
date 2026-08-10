@@ -26,13 +26,18 @@ network or run it in a shared interactive session.
 
 ### Perception
 
-- UIA `ValuePattern` text is redacted by default.
+- UIA `ValuePattern` text and password-control labels are redacted by default.
 - Raw values require `--include-raw-values` and must be treated as sensitive.
 - JSON snapshots and PNG captures are sensitive artifacts even when values are
-  redacted; labels, titles, geometry, and screenshots may still disclose data.
+  redacted; labels, titles, AutomationIds, geometry, and screenshots may still
+  disclose data. Plugin responses report this field-level redaction boundary and
+  never claim that the full artifact is safe to publish.
 - UIA work runs in a killable child process with time, element, and depth bounds.
 - Target attachment uses an exact HWND after discovery. Callers must still verify
   process identity and intended window ownership.
+- The plugin revalidates the exact HWND and owning process inside the worker
+  before and after traversal to detect handle reuse or target replacement.
+- Tool output has a hard byte budget and one scan may run per profile at a time.
 
 ### Actions
 
@@ -52,6 +57,8 @@ accepts arbitrary coordinates, scripts, key sequences, or unverified model outpu
 
 - Run as a normal user. Elevation expands the set of windows and secrets visible
   to the process.
+- Keep plugin dependencies in the profile-owned runtime created by
+  `hermes heaw setup`; do not install them into Hermes's Python environment.
 - Use a dedicated or disposable desktop session for development.
 - Do not place snapshots, screenshots, or logs in synchronized or public folders.
 - Rotate any credential observed during raw-value debugging.

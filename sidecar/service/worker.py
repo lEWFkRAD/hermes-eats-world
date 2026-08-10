@@ -13,10 +13,16 @@ from ..target import drill_frame, is_frame_window
 
 def perceive_hwnd(request: dict[str, Any]) -> dict[str, Any]:
     """Attach to one HWND and return serializable perception models."""
-    control = uiautomation.ControlFromHandle(request["hwnd"])
-    if control is None or not control.Exists(0, 3):
+    root_control = uiautomation.ControlFromHandle(request["hwnd"])
+    if root_control is None or not root_control.Exists(0, 3):
         raise RuntimeError("Could not attach to target HWND")
+    if root_control.NativeWindowHandle != request["hwnd"]:
+        raise RuntimeError("Target HWND identity did not match the requested window")
+    expected_process_id = request.get("expected_process_id")
+    if expected_process_id and root_control.ProcessId != expected_process_id:
+        raise RuntimeError("Target process identity changed before perception")
 
+    control = root_control
     if is_frame_window(request["class_name"]):
         content = drill_frame(control)
         if content is not None:
@@ -32,6 +38,16 @@ def perceive_hwnd(request: dict[str, Any]) -> dict[str, Any]:
     )
     summary = summarize_tree(root)
     tier = classify_tier(summary)
+
+    after = uiautomation.ControlFromHandle(request["hwnd"])
+    if (
+        after is None
+        or not after.Exists(0, 0)
+        or after.NativeWindowHandle != request["hwnd"]
+        or (expected_process_id and after.ProcessId != expected_process_id)
+    ):
+        raise RuntimeError("Target window identity changed during perception")
+
     return {
         "tree": root.model_dump(mode="json"),
         "summary": summary.model_dump(mode="json"),

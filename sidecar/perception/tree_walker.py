@@ -97,15 +97,24 @@ def element_to_dict(
 
         from_patterns = get_control_patterns(element, include_raw_values=include_raw_values)
 
-    # Build element dict
+    is_password = bool(getattr(element, "IsPassword", False))
+    name = str(element.Name) if element.Name else ""
+    automation_id = str(element.AutomationId) if element.AutomationId else ""
+    if is_password:
+        name = "[REDACTED]"
+        automation_id = "[REDACTED]"
+
+    # Build element dict. Password controls are always redacted even when a
+    # caller explicitly opts into raw ValuePattern text.
     elem = Element(
         id=make_element_id(element, path),
         control_type=str(element.ControlTypeName),
         localized_type=str(element.LocalizedControlType),
-        name=_truncate(str(element.Name) if element.Name else ""),
-        automation_id=_truncate(str(element.AutomationId) if element.AutomationId else ""),
+        name=_truncate(name),
+        automation_id=_truncate(automation_id),
         class_name=str(element.ClassName) if element.ClassName else "",
         hwnd=element.NativeWindowHandle or None,
+        is_password=is_password,
         is_enabled=element.IsEnabled,
         is_offscreen=element.IsOffscreen,
         bounding_box=_get_bounding_rect(element),

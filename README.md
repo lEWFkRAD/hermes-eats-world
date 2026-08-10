@@ -6,9 +6,9 @@ This repository is packaged as an independently installable Hermes standalone
 plugin. Read [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), and
 [AGENTS.md](AGENTS.md) before deploying or changing the action boundary.
 
-> **Status:** v1.0.0. Bounded perception and the standalone plugin
-> are supported. Action policy, stale-state checks, and verification receipts are
-> stable contracts, but live action execution is not exposed through the CLI.
+> **Status:** v1.1.0. Profile-aware exact-window perception is available as a
+> native Hermes plugin. Action policy, stale-state checks, and verification
+> receipts remain library contracts; the plugin and CLI expose no live actions.
 
 ## Requirements
 
@@ -18,36 +18,51 @@ plugin. Read [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), and
 
 ## Quick start
 
-Install the Python package once into Hermes's environment so the plugin entry
-point and Windows UIA dependencies are available:
+Install and enable the Git plugin for the active Hermes profile, then create its
+versioned UIA runtime:
 
 ```powershell
-python -m pip install "git+https://github.com/lEWFkRAD/hermes-eats-world.git"
-hermes plugins enable hermes-eats-world
+hermes plugins install lEWFkRAD/hermes-eats-world --enable
+hermes heaw setup
 hermes gateway restart
 ```
 
 The plugin registers the read-only `uia_perceive_window` tool. It accepts the
-fresh `read_window_below.window.id`, always redacts raw UI values, never captures
-a screenshot, and runs UIA traversal behind the killable worker boundary.
+fresh `read_window_below.window.id`, redacts ValuePattern text and password
+controls, never captures a screenshot, and runs UIA traversal in a killable,
+profile-owned runtime. Element labels and automation IDs remain available for
+perception and can still be sensitive; every response describes that boundary.
+
+`hermes heaw setup` installs Windows UIA dependencies under the active
+`HERMES_HOME\plugin-runtimes` directory. It does not modify Hermes's own Python
+environment. Use `hermes heaw status` to inspect the runtime.
 
 ### Multiple Hermes profiles
 
-Hermes profiles are isolated by `HERMES_HOME`. The package is installed once,
-but plugin enablement is intentionally per profile:
+Hermes profiles are isolated by `HERMES_HOME`; select each profile, then install,
+set up, and enable the plugin independently in every profile that should receive
+desktop perception:
 
 ```powershell
-hermes -p work plugins enable hermes-eats-world
-hermes -p personal plugins enable hermes-eats-world
-hermes -p work gateway restart
-hermes -p personal gateway restart
+hermes profile use work
+hermes plugins install lEWFkRAD/hermes-eats-world --enable
+hermes heaw setup
+hermes gateway restart
+
+hermes profile use personal
+hermes plugins install lEWFkRAD/hermes-eats-world --enable
+hermes heaw setup
+hermes gateway restart
 ```
 
+Run `hermes profile use default` afterward if you want to restore the default
+profile. Hermes 0.20 profile selection is sticky, so each command after
+`profile use` targets the selected profile until you switch again.
+
 Each profile loads its own plugin registration and every tool response includes
-the active `hermes_profile`. The tool is stateless and does not write snapshots,
-screenshots, caches, or other files that could leak across profiles. Do not pass
-one profile's HUD window handle to another profile; each call must use a fresh
-`read_window_below.window.id` from the requesting profile's current turn.
+the active `hermes_profile`. Runtime dependencies are isolated under that
+profile's `HERMES_HOME`; the tool itself does not persist snapshots, screenshots,
+caches, or UI content. Do not pass one profile's HUD handle to another profile.
 
 For source development:
 
@@ -58,6 +73,10 @@ python -m pip install -e ".[dev]"
 heaw --list
 heaw --target "Notepad" --depth 3 --output artifacts\notepad.json
 ```
+
+The published wheel has no mandatory dependencies, so installing its Hermes
+entry point cannot upgrade the host environment. Developers who need the direct
+`heaw` CLI can install the explicit `runtime` extra.
 
 ### Hermes HUD mode
 
@@ -79,14 +98,15 @@ different title/process match. HUD handoff does not enable actions, capture a
 screenshot, or include raw UI values unless those capabilities are requested
 separately.
 
-UI text values are redacted by default. `--include-raw-values` is available for
-explicitly approved debugging sessions, but its output must be treated as sensitive.
+UIA ValuePattern text and password-control labels are redacted by default.
+Element names, window titles, and AutomationIds may still contain private data,
+so every snapshot remains a sensitive artifact. `--include-raw-values` is
+available only in the developer CLI for explicitly approved debugging sessions.
 
-Tree walks default to a 30-second deadline and 5,000-element ceiling. Use
-`--timeout` and `--max-elements` to lower those bounds for constrained callers.
-Perception runs in a disposable worker process; if a UI Automation COM call
-hangs past the deadline, the parent terminates the worker and returns a
-structured, retryable error instead of freezing the caller.
+The Hermes tool defaults to 500 elements, a 15-second deadline, and a 128 KiB
+model-output budget. `mode: summary` omits the tree. Oversized results fail
+closed with smaller suggested parameters. One scan may run per profile at a
+time. The developer CLI retains broader expert controls.
 
 Run elevated only when inspecting elevated applications. Windows UIPI prevents a normal process from fully inspecting higher-integrity windows.
 
@@ -109,14 +129,16 @@ python -m pytest
 ```
 
 The test suite keeps pure model and traversal behavior independent of a live Windows desktop. Live UIA smoke tests should be run interactively and documented separately.
+See [docs/TESTING.md](docs/TESTING.md) for the sanitized smoke command and
+release application matrix.
 
 ## Roadmap
 
-1. Register exact-handle HUD perception as a typed Hermes tool.
-2. Add a Hermes command surface for perception and dry-run action planning.
-3. Add an explicitly enabled UIA invoke adapter behind the existing policy gate.
-4. Expand calibrated fixtures across common Windows applications.
-5. Package signed Windows executables in addition to the Python wheel.
+1. Expand calibrated live fixtures across Office, Explorer, browsers, WinUI,
+   UWP, DPI, elevation, and stale-window scenarios.
+2. Add query and pagination modes for very large accessibility trees.
+3. Package a signed Windows executable as an alternative isolated runtime.
+4. Keep any future action capability in a separate, explicitly enabled plugin.
 
 See `spikes/001-perception-spike/SYNTHESIS.md` for the initial research record.
 

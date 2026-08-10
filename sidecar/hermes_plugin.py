@@ -1,27 +1,30 @@
-"""First-class Hermes plugin integration for exact-window UIA perception.
-
-The plugin is deliberately stateless. Hermes loads and enables it inside the
-active profile, while every tool response records that profile name. No state,
-screenshots, or raw UI values are shared between profiles.
-"""
+"""Hermes plugin registration for profile-scoped Windows UIA perception."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
-import sys
-from datetime import datetime, timezone
+import threading
 from functools import partial
 from typing import Any
 
+from .plugin_runtime import (
+    configure_cli,
+    handle_cli,
+    run_runtime_worker,
+    runtime_available,
+    runtime_python,
+)
+
 TOOL_NAME = "uia_perceive_window"
+_SCAN_SLOT = threading.BoundedSemaphore(1)
 
 TOOL_SCHEMA: dict[str, Any] = {
     "name": TOOL_NAME,
     "description": (
-        "Read a redacted Windows UI Automation tree for one exact native window. "
-        "Pass the fresh window.id returned by Hermes HUD mode's read_window_below "
-        "tool. The lookup fails closed and never falls back to title or process matching."
+        "Read one bounded Windows UI Automation snapshot for the exact native window "
+        "returned by Hermes HUD mode. ValuePattern text and password controls are redacted, "
+        "but labels and automation identifiers can still be sensitive. The lookup fails closed "
+        "and never falls back to title or process matching."
     ),
     "parameters": {
         "type": "object",
@@ -29,7 +32,13 @@ TOOL_SCHEMA: dict[str, Any] = {
             "window_id": {
                 "type": "integer",
                 "minimum": 1,
-                "description": "Exact Windows HWND from read_window_below.window.id.",
+                "description": "Fresh Windows HWND from read_window_below.window.id.",
+            },
+            "mode": {
+                "type": "string",
+                "enum": ["tree", "summary"],
+                "default": "tree",
+                "description": "Return the bounded UIA tree or only target/tier/summary metadata.",
             },
             "depth": {
                 "type": "integer",
@@ -41,27 +50,29 @@ TOOL_SCHEMA: dict[str, Any] = {
             "max_elements": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 5000,
-                "default": 2000,
-                "description": "Hard ceiling for returned UI elements.",
+                "maximum": 2000,
+                "default": 500,
+                "description": "Hard ceiling for inspected UI elements.",
+            },
+            "max_output_bytes": {
+                "type": "integer",
+                "minimum": 16384,
+                "maximum": 262144,
+                "default": 131072,
+                "description": "Maximum UTF-8 size of the returned JSON payload.",
             },
             "timeout": {
                 "type": "number",
                 "minimum": 1,
                 "maximum": 30,
                 "default": 15,
-                "description": "Killable UIA worker deadline in seconds.",
+                "description": "Killable runtime deadline in seconds.",
             },
         },
         "required": ["window_id"],
         "additionalProperties": False,
     },
 }
-
-
-def check_uia_available() -> bool:
-    """Expose the tool only on Windows with the UI Automation dependency installed."""
-    return sys.platform == "win32" and importlib.util.find_spec("uiautomation") is not None
 
 
 def _error(profile_name: str, code: str, message: str, *, retryable: bool = False) -> str:
@@ -93,95 +104,95 @@ def _bounded_timeout(args: dict[str, Any]) -> float:
     return value
 
 
+def _mode(args: dict[str, Any]) -> str:
+    value = args.get("mode", "tree")
+    if value not in {"tree", "summary"}:
+        raise ValueError("mode must be 'tree' or 'summary'")
+    return value
+
+
 def handle_uia_perceive_window(
     args: dict[str, Any] | None,
     *,
     profile_name: str = "default",
     **_kwargs: Any,
 ) -> str:
-    """Return one redacted, bounded snapshot without writing profile-shared state."""
+    """Run one exact-window snapshot through the profile-owned isolated runtime."""
     args = args or {}
     try:
-        window_id = _bounded_int(args, "window_id", 0, 1, 2**63 - 1)
-        depth = _bounded_int(args, "depth", 3, 0, 10)
-        max_elements = _bounded_int(args, "max_elements", 2000, 1, 5000)
-        timeout = _bounded_timeout(args)
+        request = {
+            "window_id": _bounded_int(args, "window_id", 0, 1, 2**63 - 1),
+            "mode": _mode(args),
+            "depth": _bounded_int(args, "depth", 3, 0, 10),
+            "max_elements": _bounded_int(args, "max_elements", 500, 1, 2000),
+            "max_output_bytes": _bounded_int(
+                args, "max_output_bytes", 131072, 16384, 262144
+            ),
+            "timeout": _bounded_timeout(args),
+        }
     except ValueError as exc:
         return _error(profile_name, "invalid_arguments", str(exc))
 
-    if not check_uia_available():
+    if not runtime_available():
         return _error(
             profile_name,
-            "uia_unavailable",
-            "UIA perception requires Windows and the uiautomation package.",
+            "runtime_unavailable",
+            f"Activate '{profile_name}' with 'hermes profile use {profile_name}', run "
+            "'hermes heaw setup' on Windows, then restart that profile's gateway.",
         )
 
-    # Imports stay lazy so Hermes can discover and list the plugin even before
-    # the optional Windows runtime dependencies are installed.
-    from .schema import SCHEMA_VERSION, Element, TierClassification, TreeSnapshot, TreeSummary
-    from .service.env_check import set_dpi_awareness
-    from .service.isolation import run_isolated
-    from .service.worker import perceive_hwnd
-    from .target import find_window
-
-    set_dpi_awareness()
-    target = find_window(hwnd=window_id, timeout=min(5, max(1, int(timeout))))
-    if target is None or target.hwnd != window_id:
+    if not _SCAN_SLOT.acquire(blocking=False):
         return _error(
             profile_name,
-            "window_not_found",
-            f"Could not attach to exact window id {window_id}.",
+            "scan_in_progress",
+            "Another UIA scan is already running in this Hermes profile.",
             retryable=True,
         )
 
-    worker_result = run_isolated(
-        perceive_hwnd,
-        {
-            "hwnd": window_id,
-            "class_name": target.class_name,
-            "max_depth": depth,
-            "include_raw_values": False,
-            "max_elements": max_elements,
-            "timeout": timeout,
-        },
-        timeout=timeout + 1,
-    )
-    if worker_result.status != "success":
+    try:
+        result = run_runtime_worker(request, timeout=request["timeout"] + 2)
+    finally:
+        _SCAN_SLOT.release()
+
+    result["hermes_profile"] = profile_name
+    encoded = json.dumps(result, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    if len(encoded) > request["max_output_bytes"]:
         return _error(
             profile_name,
-            f"tree_worker_{worker_result.status}",
-            worker_result.error or "UIA perception worker failed.",
-            retryable=worker_result.status in {"timeout", "crash"},
+            "output_budget_exceeded",
+            "The UIA result exceeded the configured model-output budget.",
+            retryable=True,
         )
-
-    payload = worker_result.value
-    snapshot = TreeSnapshot(
-        schema_version=SCHEMA_VERSION,
-        target=target,
-        tier=TierClassification.model_validate(payload["tier"]),
-        summary=TreeSummary.model_validate(payload["summary"]),
-        tree=Element.model_validate(payload["tree"]),
-        screenshot_path=None,
-        timestamp=datetime.now(timezone.utc).isoformat(),
-    )
-    return json.dumps(
-        {
-            "hermes_profile": profile_name,
-            "redacted": True,
-            "snapshot": snapshot.model_dump(mode="json"),
-        },
-        indent=2,
-    )
+    return encoded.decode("utf-8")
 
 
 def register(ctx: Any) -> None:
-    """Register one read-only tool scoped to the active Hermes profile."""
+    """Register a read-only tool and operator setup command for the active profile."""
     ctx.register_tool(
         name=TOOL_NAME,
         toolset="hermes_eats_world",
         schema=TOOL_SCHEMA,
         handler=partial(handle_uia_perceive_window, profile_name=ctx.profile_name),
-        check_fn=check_uia_available,
-        description="Read a bounded, redacted UIA tree for an exact HUD window handle.",
+        check_fn=runtime_available,
+        description=TOOL_SCHEMA["description"],
         emoji="🪟",
     )
+    ctx.register_cli_command(
+        name="heaw",
+        help="Set up and inspect the isolated Hermes Eats World runtime",
+        setup_fn=configure_cli,
+        handler_fn=handle_cli,
+        description=(
+            "Create a profile-owned Python runtime for Windows UI Automation without "
+            "modifying Hermes's Python environment."
+        ),
+    )
+
+
+__all__ = [
+    "TOOL_NAME",
+    "TOOL_SCHEMA",
+    "handle_uia_perceive_window",
+    "register",
+    "runtime_python",
+]

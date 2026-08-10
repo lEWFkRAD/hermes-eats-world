@@ -19,8 +19,9 @@ for recovery and audit.
 
 `Required PR checks` is the aggregate gate in `.github/workflows/ci.yml`. It
 fails unless lint/policy checks, the Windows Python test matrix, wheel build and
-clean installation, and pull-request DCO validation all succeed. Requiring only
-the aggregate avoids branch-rule churn when the test matrix changes.
+clean installation, dependency auditing, and pull-request DCO validation all
+succeed. Requiring only the aggregate avoids branch-rule churn when the test
+matrix changes.
 
 ## History and safety
 

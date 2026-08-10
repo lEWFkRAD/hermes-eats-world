@@ -18,7 +18,7 @@ def request(**overrides):
         "action": ActionKind.INVOKE,
         "risk": RiskLevel.LOW,
         "reason": "Save the reviewed draft",
-        "snapshot_schema_version": "1.0.0",
+        "snapshot_schema_version": "1.1.0",
     }
     values.update(overrides)
     return ActionRequest(**values)
