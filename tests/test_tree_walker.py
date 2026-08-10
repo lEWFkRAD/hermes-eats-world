@@ -59,6 +59,7 @@ class FakeControl:
     AutomationId = "save"
     ClassName = "Button"
     NativeWindowHandle = 1
+    IsPassword = False
     IsEnabled = True
     IsOffscreen = False
     BoundingRectangle = Rect()
@@ -97,3 +98,23 @@ def test_tree_walk_enforces_element_limit():
             max_elements=2,
             deadline=time.monotonic() + 1,
         )
+
+
+def test_password_control_labels_are_always_redacted():
+    control = FakeControl()
+    control.Name = "client-secret-123"
+    control.AutomationId = "password-field"
+    control.IsPassword = True
+
+    result, _truncated = element_to_dict(
+        control,
+        max_depth=0,
+        from_patterns={"value": {"supported": True, "value": "[REDACTED]"}},
+        max_elements=1,
+        deadline=time.monotonic() + 1,
+        include_raw_values=True,
+    )
+
+    assert result.is_password is True
+    assert result.name == "[REDACTED]"
+    assert result.automation_id == "[REDACTED]"

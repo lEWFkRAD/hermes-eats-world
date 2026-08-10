@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
 
 
 # ─── Bounding Box ────────────────────────────────────────────────
@@ -126,6 +126,10 @@ class Element(BaseModel):
     automation_id: str = Field(default="", description="UIA AutomationId")
     class_name: str = Field(default="", description="Window class name")
     hwnd: Optional[int] = Field(default=None, description="Native HWND for T2 PostMessage actions")
+    is_password: bool = Field(
+        default=False,
+        description="True when UIA marks the control as password-bearing; labels are redacted",
+    )
     is_enabled: bool = True
     is_offscreen: bool = False
     bounding_box: Optional[BoundingBox] = None

@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 
 from sidecar.action.policy import POLICY_VERSION
+from sidecar.plugin_runtime import PLUGIN_VERSION
 from sidecar.schema import SCHEMA_VERSION
 
 ROOT = Path(__file__).parents[1]
@@ -22,10 +23,11 @@ def plugin_version():
 
 
 def test_release_versions_are_synchronized():
-    assert project_version() == "1.0.0"
+    assert project_version() == "1.1.0"
     assert plugin_version() == project_version()
     assert SCHEMA_VERSION == project_version()
     assert POLICY_VERSION == project_version()
+    assert PLUGIN_VERSION == project_version()
 
 
 def test_changelog_contains_current_release():

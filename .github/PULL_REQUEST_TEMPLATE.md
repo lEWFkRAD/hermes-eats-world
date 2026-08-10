@@ -9,6 +9,7 @@ Closes #
 - [ ] `python -m ruff check sidecar scripts tests`
 - [ ] `python -m pytest -q`
 - [ ] `python -m build --wheel`
+- [ ] `python -m pip_audit`
 - [ ] Live Windows UIA smoke test (only check if performed)
 
 ## Submission
@@ -21,7 +22,9 @@ Closes #
 ## Safety and compatibility
 
 - [ ] No secrets, screenshots, UI snapshots, client data, or unsanitized logs
-- [ ] Raw UI values remain redacted by default
+- [ ] ValuePattern text and password controls remain redacted by default
+- [ ] Sensitive labels and AutomationIds are not described as fully redacted
+- [ ] Model-facing output and concurrency limits remain intact
 - [ ] UIA worker isolation and traversal limits remain intact
 - [ ] Action execution remains deny-by-default and HWND-scoped
 - [ ] Stale-state and post-action verification remain intact

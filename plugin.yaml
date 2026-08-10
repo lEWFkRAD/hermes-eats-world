@@ -1,13 +1,14 @@
 manifest_version: 1
 name: hermes-eats-world
-version: 1.0.0
+version: 1.1.0
 description: >
-  Install and operate the Windows UI Automation perception and verified-action
-  sidecar for Hermes Agent.
+  Profile-aware, read-only Windows UI Automation perception for exact Hermes
+  Desktop HUD window handoffs.
 author: Jeffrey Watts
 kind: standalone
 platforms:
   - windows
-provides_tools: []
+provides_tools:
+  - uia_perceive_window
 requires_env: []
 optional_env: []

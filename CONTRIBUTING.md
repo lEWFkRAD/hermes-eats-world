@@ -12,10 +12,13 @@ python -m pip install -e ".[dev]"
 python -m ruff check sidecar scripts tests
 python -m pytest -q
 python -m build --wheel
+python -m pip_audit
 ```
 
 Run live UIA tests only in an interactive disposable session. Never commit real
 snapshots, screenshots, window inventories, client data, credentials, or logs.
+Targeting, runtime, DPI, capture, or worker-boundary changes also require the
+sanitized exact-HWND check and release matrix in `docs/TESTING.md`.
 
 ## Pull requests
 

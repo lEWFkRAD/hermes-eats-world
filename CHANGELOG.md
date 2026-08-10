@@ -5,15 +5,27 @@ Versioning and uses GitHub Releases for distributable artifacts.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-09
+
 ### Added
 
 - Exact `--window-id` / `--hwnd` targeting for a safe handoff from Hermes
   Desktop HUD mode's `read_window_below.window.id` on Windows.
+- First-class Hermes plugin entry points for directory and pip installations.
+- A profile-aware, read-only `uia_perceive_window` tool that reports the active
+  Hermes profile while keeping perception stateless.
+- A profile-owned `hermes heaw setup` runtime that isolates UIA dependencies
+  from Hermes's Python environment.
+- Summary mode, a hard model-output byte budget, and per-profile scan concurrency.
 
 ### Security
 
 - Exact-handle targeting fails closed when the supplied HWND is invalid or
   inaccessible instead of falling back to an ambiguous title or process match.
+- The worker revalidates both HWND and process identity before and after traversal.
+- Password controls are always redacted, worker errors are sanitized, and
+  responses describe which label fields remain sensitive instead of claiming
+  complete redaction.
 
 ## [1.0.0] - 2026-07-12
 
@@ -40,3 +52,4 @@ Versioning and uses GitHub Releases for distributable artifacts.
 - The release is Windows-only and requires an interactive desktop session.
 
 [1.0.0]: https://github.com/lEWFkRAD/hermes-eats-world/releases/tag/v1.0.0
+[1.1.0]: https://github.com/lEWFkRAD/hermes-eats-world/releases/tag/v1.1.0
