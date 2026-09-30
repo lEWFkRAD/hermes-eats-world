@@ -1,7 +1,13 @@
 import time
 
 from sidecar.service.isolation import run_isolated
-from tests.isolation_helpers import exit_without_result, hang_forever, raise_error, return_value
+from tests.isolation_helpers import (
+    exit_without_result,
+    hang_forever,
+    raise_error,
+    return_value,
+    return_with_hanging_thread,
+)
 
 
 def test_isolated_worker_returns_value():
@@ -34,3 +40,21 @@ def test_isolated_worker_reports_crash_without_payload():
 
     assert result.status == "crash"
     assert result.exit_code == 7
+
+
+def test_isolated_worker_drains_large_results_before_joining():
+    payload = {"text": "x" * (1024 * 1024)}
+    result = run_isolated(return_value, payload, timeout=5)
+
+    assert result.status == "success"
+    assert result.value == payload
+    assert result.exit_code == 0
+
+
+def test_isolated_worker_deadline_includes_shutdown_after_result():
+    started = time.monotonic()
+    result = run_isolated(return_with_hanging_thread, timeout=0.5)
+
+    assert result.status == "timeout"
+    assert result.exit_code is not None
+    assert time.monotonic() - started < 3
