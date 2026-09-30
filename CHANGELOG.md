@@ -5,6 +5,12 @@ Versioning and uses GitHub Releases for distributable artifacts.
 
 ## [Unreleased]
 
+### Fixed
+
+- Drain developer CLI worker results before joining the process so large UIA
+  snapshots do not deadlock the queue feeder and falsely time out. Keep worker
+  shutdown within the same deadline and retain forced termination on failure.
+
 ## [1.1.0] - 2026-08-09
 
 ### Added

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import multiprocessing
 import queue
+import time
 import traceback
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -45,31 +46,51 @@ def run_isolated(
         args=(result_queue, function, args),
         daemon=True,
     )
+    deadline = time.monotonic() + timeout
     process.start()
-    process.join(timeout)
-
-    if process.is_alive():
-        process.terminate()
-        process.join(5)
-        if process.is_alive():
-            process.kill()
-            process.join(5)
-        result_queue.close()
-        return IsolatedResult(
-            status="timeout",
-            error=f"Worker exceeded {timeout:g} seconds and was terminated",
-            exit_code=process.exitcode,
-        )
-
     try:
-        payload = result_queue.get(timeout=1)
-    except queue.Empty:
-        return IsolatedResult(
-            status="crash",
-            error="Worker exited without returning a result",
-            exit_code=process.exitcode,
-        )
+        # Drain while the child is alive. Joining first can deadlock when its
+        # Queue feeder fills the pipe and cannot finish flushing a large result.
+        payload = None
+        while payload is None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                payload = result_queue.get(timeout=min(remaining, 0.05))
+            except queue.Empty:
+                if not process.is_alive():
+                    # The child may have flushed and exited between the timed
+                    # read and is_alive(). Check once more before calling it a crash.
+                    try:
+                        payload = result_queue.get_nowait()
+                    except queue.Empty:
+                        return IsolatedResult(
+                            status="crash",
+                            error="Worker exited without returning a result",
+                            exit_code=process.exitcode,
+                        )
+        if payload is not None:
+            process.join(max(0, deadline - time.monotonic()))
+        if payload is None or process.is_alive():
+            _terminate_worker(process)
+            return IsolatedResult(
+                status="timeout",
+                error=f"Worker exceeded {timeout:g} seconds and was terminated",
+                exit_code=process.exitcode,
+            )
+        return IsolatedResult(exit_code=process.exitcode, **payload)
     finally:
+        if process.is_alive():
+            _terminate_worker(process)
         result_queue.close()
+        if not process.is_alive():
+            process.close()
 
-    return IsolatedResult(exit_code=process.exitcode, **payload)
+
+def _terminate_worker(process) -> None:
+    process.terminate()
+    process.join(5)
+    if process.is_alive():
+        process.kill()
+        process.join(5)

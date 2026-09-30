@@ -1,4 +1,5 @@
 import os
+import threading
 import time
 
 
@@ -17,3 +18,8 @@ def hang_forever():
 
 def exit_without_result():
     os._exit(7)
+
+
+def return_with_hanging_thread():
+    threading.Thread(target=time.sleep, args=(60,)).start()
+    return {"ok": True}
