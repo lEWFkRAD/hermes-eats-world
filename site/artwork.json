@@ -1,0 +1,8 @@
+{
+  "source": "OpenAI built-in imagegen",
+  "kind": "Concept illustration",
+  "sha256": "2a44f7096d1f8e324159b41bce97f26bb8ee6d3fae07a082c3aec168d5ab9a2f",
+  "prompts": [
+    "Use case: ads-marketing. Asset: polished public open-source repository banner, exactly wide 2:1 composition (2048x1024). Create a premium editorial physical illustration for the Windows UI Automation perception plugin Hermes Eats World. A beautifully crafted floating desktop window made from layered matte slate-blue cards unfolds into a precise branching accessibility tree of small ivory controls, with one warm amber frame identifying the single observed window. A discreet optical lens suggests read-only perception; no hands clicking, robots, autonomous actions or weapons. Tactile paper, anodized metal and translucent glass, soft studio shadows on a deep desaturated blue background, refined geometry and generous breathing room. Prominently integrate the exact title \"Hermes Eats World\" in elegant, highly readable editorial typography on the left, and only the small subtitle \"Read-only desktop perception\". Illustration occupies the right half. Keep all lettering and key objects within a 10% safe margin. This is conceptual release artwork, not a fake product screenshot: no actual app interfaces, private data, IP addresses, code dumps, brand logos or performance claims. Distinctive, calm, sophisticated art direction; no neon circuits, glowing network globe, generic AI brain, gradients behind illegible tiny text, watermark or decorative gibberish."
+  ]
+}

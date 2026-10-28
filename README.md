@@ -1,3 +1,12 @@
+<!-- project-home:start -->
+![Hermes Eats World concept banner](site/hero.png)
+
+**[Hermes Eats World project homepage](https://lewfkrad.github.io/hermes-eats-world/)** · [Documentation](https://github.com/lEWFkRAD/hermes-eats-world#quick-start)
+
+Give Hermes a structured, read-only view of Windows applications through UI Automation.
+
+<!-- project-home:end -->
+
 # Hermes Eats World
 
 Windows UI Automation perception sidecar for Hermes Agent. It discovers desktop windows, walks their UIA accessibility trees, classifies how automatable they are, and emits a versioned JSON snapshot that downstream planners can consume.
